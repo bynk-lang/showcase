@@ -1,0 +1,79 @@
+suite shop.product
+
+// A stub with `after` or `never` runs on the harness's virtual clock: the
+// clock jumps to the next timer instead of sleeping, so `after 3.seconds`
+// costs no real time and every run gives the same outcome.
+
+case "the three lookups are issued together, in source order" {
+	stub Stock.level(_) returns 4 after 1.seconds
+	stub Prices.get(_, _) returns 12 after 1.seconds
+	stub Couriers.estimate(_) returns 2 after 1.seconds
+	let r <- page.call(7)
+	expect r == "£12, 4 in stock, delivery in 2 days"
+	expect Stock.level before Prices.get
+	expect Prices.get before Couriers.estimate
+}
+
+case "the faster price mirror wins" {
+	stub Stock.level(_) returns 4
+	stub Prices.get("east", _) returns 13 after 2.seconds
+	stub Prices.get("west", _) returns 12 after 1.seconds
+	stub Couriers.estimate(_) returns 2
+	let r <- page.call(7)
+	expect r == "£12, 4 in stock, delivery in 2 days"
+	// The loser was not cancelled: it was asked too.
+	expect Prices.get called 2 times
+}
+
+case "a mirror that fails fast loses to one that answers later" {
+	stub Stock.level(_) returns 0
+	stub Prices.get("east", _) fails
+	stub Prices.get("west", _) returns 12 after 3.seconds
+	stub Couriers.estimate(_) returns 2
+	let r <- page.call(7)
+	expect r == "£12, out of stock, delivery in 2 days"
+}
+
+case "a slow courier times out and the page renders without it" {
+	stub Stock.level(_) returns 4
+	stub Prices.get(_, _) returns 12
+	stub Couriers.estimate(_) returns 2 after 3.seconds
+	let r <- page.call(7)
+	expect r == "£12, 4 in stock, delivery date to follow"
+	// The timeout stopped the wait, not the call.
+	expect Couriers.estimate called once
+}
+
+case "a courier that never answers times out too" {
+	stub Stock.level(_) returns 4
+	stub Prices.get(_, _) returns 12
+	stub Couriers.estimate(_) never
+	let r <- page.call(7)
+	expect r == "£12, 4 in stock, delivery date to follow"
+}
+
+case "an estimate that lands exactly on the deadline is in time" {
+	stub Stock.level(_) returns 4
+	stub Prices.get(_, _) returns 12
+	stub Couriers.estimate(_) returns 2 after 2.seconds
+	let r <- page.call(7)
+	expect r == "£12, 4 in stock, delivery in 2 days"
+}
+
+case "when one lookup faults, the whole page faults" {
+	stub Stock.level(_) fails
+	stub Prices.get(_, _) returns 12 after 1.seconds
+	stub Couriers.estimate(_) returns 2 after 1.seconds
+	expect page.call(7) faults
+	// Its siblings had already been issued. The block waits for them to
+	// settle before it raises the fault.
+	expect Prices.get called 2 times
+	expect Couriers.estimate called once
+}
+
+case "when both price mirrors fail, the page faults" {
+	stub Stock.level(_) returns 4
+	stub Prices.get(_, _) fails
+	stub Couriers.estimate(_) returns 2
+	expect page.call(7) faults
+}

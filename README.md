@@ -21,9 +21,14 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`agent-state-machine`](agent-state-machine/) | agents, a `Cell`, and invariants | [State machine](https://bynk-lang.org/book/guides/agents-and-state/state-machine/) |
 | [`storage-and-queries`](storage-and-queries/) | agent storage (`Map`, `Cache`, `Log`) and `Query[T]` | [Agents](https://bynk-lang.org/book/reference/agents/) |
 | [`testing`](testing/) | tests in the language: stubs, platform doubles, fixtures | [Write tests](https://bynk-lang.org/book/guides/testing/write-tests/) |
-
-More are on the way, covering concurrency, actors, entry points, events,
-localisation and program structure.
+| [`actors-and-authorisation`](actors-and-authorisation/) | public and authenticated routes, claim checks, an agent keyed by the caller | [Authorisation](https://bynk-lang.org/book/guides/actors/authorisation/) |
+| [`verify-webhooks`](verify-webhooks/) | signed webhooks verified for you; signing your own data | [Verify webhooks](https://bynk-lang.org/book/guides/actors/verify-webhooks/) |
+| [`scheduled-jobs`](scheduled-jobs/) | cron handlers, driven from tests at a chosen time | [Cron](https://bynk-lang.org/book/guides/entry-points/cron/) |
+| [`queues`](queues/) | sending to a queue, consuming it, `Ack` and `Retry` | [Queue](https://bynk-lang.org/book/guides/entry-points/queue/) |
+| [`events`](events/) | declaring, emitting and subscribing to events | [Understand events](https://bynk-lang.org/book/guides/events/understand-events/) |
+| [`localisation`](localisation/) | message bundles, ICU plurals, `Locale` negotiation | [Understand localisation](https://bynk-lang.org/book/guides/localisation/understand-localisation/) |
+| [`concurrency`](concurrency/) | `par`, `race` and `within`, tested on virtual time | [Run calls at the same time](https://bynk-lang.org/book/guides/effects-and-capabilities/run-independent-calls-at-the-same-time/) |
+| [`public-surface`](public-surface/) | a library's public surface: `private`, options records, `uses` | [Design a public surface](https://bynk-lang.org/book/guides/program-structure/design-a-public-surface/) |
 
 ## Running a project
 

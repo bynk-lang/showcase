@@ -1,0 +1,47 @@
+// At `system` each call goes through the deployable Worker's real auth seam:
+// `by Author("ada")` is signed into a JWT, and `Nobody`, `Forged` and `Expired`
+// send the credentials the seam must refuse. A `401` is refused before the
+// handler runs, so it reads as `Rejected(Unauthorized)`. The `403` from a
+// missing claim reads as the plain `Forbidden` result.
+suite blog.authors as system {
+	env {
+		AUTH_JWT_SECRET = "test-secret"
+	}
+
+	case "a visitor needs no credential to read" {
+		let r <- api.GET("/authors/:id/bio", "ada") by Visitor
+		expect r is NotFound
+	}
+
+	case "a signed-in author may write" {
+		let r <- api.PUT(
+			"/me/bio",
+			BioUpdate { bio: "Writes about type systems." }
+		) by Author("ada")
+		expect r == Ok("Writes about type systems.")
+	}
+
+	case "a write without a valid token is refused" {
+		let none <- api.PUT("/me/bio", BioUpdate { bio: "Anonymous." }) by Nobody
+		let forged <- api.PUT("/me/bio", BioUpdate { bio: "Forged." }) by Forged
+		let expired <- api.PUT("/me/bio", BioUpdate { bio: "Expired." }) by Expired
+		expect none is Rejected(Unauthorized)
+		expect forged is Rejected(Unauthorized)
+		expect expired is Rejected(Unauthorized)
+	}
+
+	case "an author without the moderator claim is forbidden" {
+		let r <- api.DELETE("/authors/:id/bio", "bob") by Author("ada")
+		expect r is Forbidden
+	}
+
+	case "a moderator is answered" {
+		let r <- api.DELETE("/authors/:id/bio", "bob") by Moderator("mo")
+		expect r is NoContent
+	}
+
+	case "a moderator route refuses an anonymous caller" {
+		let r <- api.DELETE("/authors/:id/bio", "bob") by Nobody
+		expect r is Rejected(Unauthorized)
+	}
+}

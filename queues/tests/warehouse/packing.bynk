@@ -1,0 +1,16 @@
+// In process: the queue producer is a recording double, so a case can see what
+// a handler sent and logged. Nothing sent here reaches the consumer.
+suite warehouse.packing {
+	case "an order is put on the queue and accepted at once" {
+		let r <- api.POST("/orders", Order { sku: "MUG-001", quantity: 2 }) by Visitor
+		expect r is Accepted("queued")
+		expect Packing.sendValue called once
+		expect Logger.info called once
+	}
+
+	case "a malformed job is dropped with a warning, not retried" {
+		let r <- packer.message(PackJob { sku: "mug", quantity: 2 })
+		expect r is Ack
+		expect Logger.warn called once
+	}
+}

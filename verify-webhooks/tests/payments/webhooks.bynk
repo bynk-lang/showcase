@@ -1,0 +1,57 @@
+---
+These cases run as `system`: the context runs as the Worker it deploys as, so
+the generated signature check sees every request. The driver signs each call as
+`Processor` declares, over exactly the bytes it sends. `by Nobody`, `by Forged`
+and `by Stale` send what the check must refuse.
+---
+suite payments.hooks as system {
+	env {
+		WEBHOOK_SECRET = "test-webhook-secret"
+		RECEIPT_KEY = "test-receipt-key"
+	}
+
+	case "a correctly signed notice is accepted and gets a receipt" {
+		let r <- webhooks.POST("/webhooks/payment", Payment { id: "pay_1", amountPence: 1250 })
+		expect r is Ok(_)
+	}
+
+	case "a notice with no signature header is refused" {
+		let notice = Payment {
+			id: "pay_1",
+			amountPence: 1250,
+		}
+		let r <- webhooks.POST("/webhooks/payment", notice) by Nobody
+		expect r is Rejected(Unauthorized)
+	}
+
+	case "a notice signed with the wrong secret is refused" {
+		let notice = Payment {
+			id: "pay_1",
+			amountPence: 1250,
+		}
+		let r <- webhooks.POST("/webhooks/payment", notice) by Forged
+		expect r is Rejected(Unauthorized)
+	}
+
+	case "a replayed notice from outside the window is refused" {
+		let notice = Payment {
+			id: "pay_1",
+			amountPence: 1250,
+		}
+		let r <- webhooks.POST("/webhooks/payment", notice) by Stale
+		expect r is Rejected(Unauthorized)
+	}
+
+	---
+	A `Wire` body is signed as written, so this one passes the signature check.
+	It is still refused, because the body is parsed next and the amount is not
+	an `Int`. A valid signature never skips validation.
+	---
+	case "a signed but malformed body is refused" {
+		let r <- webhooks.POST(
+			"/webhooks/payment",
+			Wire("{\"id\": \"pay_2\", \"amountPence\": \"lots\"}")
+		)
+		expect r is Rejected(StructuralMismatch(_))
+	}
+}

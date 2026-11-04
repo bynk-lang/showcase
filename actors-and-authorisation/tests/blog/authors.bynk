@@ -1,0 +1,35 @@
+suite blog.authors
+
+// At the unit tier a call's `by` clause *gives* the identity: the handler runs
+// in process as that caller. These cases check what each caller may do. The
+// refusals live in `seam.bynk`: below `system` the auth seam is skipped, so a
+// unit case can't show a token being turned away.
+
+case "a visitor reads a bio nobody has written as not found" {
+	let r <- api.GET("/authors/:id/bio", "ada") by Visitor
+	expect r is NotFound
+}
+
+case "an author's bio is public once written" {
+	let w <- api.PUT("/me/bio", BioUpdate { bio: "Writes about type systems." }) by Author("ada")
+	expect w == Ok("Writes about type systems.")
+	let r <- api.GET("/authors/:id/bio", "ada") by Visitor
+	expect r == Ok("Writes about type systems.")
+}
+
+case "an author's write lands on their own bio only" {
+	let _ <- api.PUT("/me/bio", BioUpdate { bio: "Ada's bio." }) by Author("ada")
+	let _ <- api.PUT("/me/bio", BioUpdate { bio: "Bob was here." }) by Author("bob")
+	let ada <- api.GET("/authors/:id/bio", "ada") by Visitor
+	let bob <- api.GET("/authors/:id/bio", "bob") by Visitor
+	expect ada == Ok("Ada's bio.")
+	expect bob == Ok("Bob was here.")
+}
+
+case "a moderator clears another author's bio" {
+	let _ <- api.PUT("/me/bio", BioUpdate { bio: "Buy cheap watches!" }) by Author("spammer")
+	let d <- api.DELETE("/authors/:id/bio", "spammer") by Moderator("mo")
+	expect d is NoContent
+	let r <- api.GET("/authors/:id/bio", "spammer") by Visitor
+	expect r is NotFound
+}

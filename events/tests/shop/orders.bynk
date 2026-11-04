@@ -1,0 +1,18 @@
+---
+The publisher's side. Under test, `Events` is a double that records each
+emission, so a case can check that the checkout announced an order without any
+subscriber running.
+---
+suite shop.orders
+
+case "a placed order is announced once" {
+	let r <- checkout.call("o-1", "ada", Region.Domestic, 2500)
+	expect r is Ok(_)
+	expect Events.emit called once
+}
+
+case "a refused order is never announced" {
+	let r <- checkout.call("o-2", "ada", Region.Domestic, 0)
+	expect r is Err(_)
+	expect Events.emit called 0 times
+}

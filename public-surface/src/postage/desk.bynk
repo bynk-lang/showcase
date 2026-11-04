@@ -1,0 +1,45 @@
+---
+The post-office desk: an HTTP service that quotes postage.
+
+It reaches `postage.rates` only through its public surface: `quoteWith`,
+`describe` and the types they mention. The bands and the fees are private to
+that commons, so calling `bandFor` here would be refused with
+`bynk.visibility.private_item`.
+---
+context postage.desk
+
+uses postage.rates
+
+---
+A quote request. It carries the commons' own `QuoteOptions`, defaulted, so a
+body without `options` gets a plain quote, and an option added to
+`postage.rates` reaches the wire without this context changing.
+---
+type QuoteRequest = {
+	weight: Grams,
+	options: QuoteOptions = QuoteOptions {},
+}
+
+--- A price in pence, with a line a person can read.
+type QuoteView = {
+	pence: Int,
+	summary: String,
+}
+
+service api from http {
+	--- Quote postage for one parcel.
+	on POST("/quotes") (body: QuoteRequest) -> Effect[HttpResult[QuoteView]] by Visitor {
+		Ok(QuoteView {
+			pence: quoteWith(body.weight, body.options),
+			summary: "\(describe(body.weight)), \(serviceName(body.options.speed))",
+		})
+	}
+}
+
+--- How the desk names a service in a quote's summary.
+fn serviceName(speed: Speed) -> String {
+	match speed {
+		Standard => "standard",
+		Express => "express",
+	}
+}

@@ -1,0 +1,11 @@
+suite shop.web
+
+// At the unit tier `Locale` is a test double. A stub chooses the language,
+// which shows the handler renders whatever tag the capability reports.
+
+case "the handler renders in the locale it is given" {
+	stub Locale.current() returns "pl"
+	let r <- api.GET("/basket", BasketQuery { items: 3 }, RequestHeaders.empty()) by Visitor
+	expect r == Ok("3 produkty w koszyku")
+	expect Locale.current called once
+}

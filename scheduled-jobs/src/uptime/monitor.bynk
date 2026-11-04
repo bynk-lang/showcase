@@ -1,0 +1,150 @@
+context uptime.monitor
+
+uses uptime.policy
+consumes bynk { Clock, Fetch, Logger }
+
+type Name = String where NonEmpty && MaxLength(40)
+
+type Url = String where Matches("https?://.+")
+
+--- What the last probe of a target found.
+type Probe =
+	| Unchecked
+	| Answered(status: Int)
+	| Unreachable
+
+type Target = {
+	name: Name,
+	url: Url,
+	last: Probe,
+	--- When the target last answered healthily, or when it was added if it never has.
+	seenUp: Instant,
+}
+
+--- What a caller sends to start watching a URL.
+type NewTarget = {
+	name: Name,
+	url: Url,
+}
+
+---
+Every handler works on the one watchlist, so its key is a fixed name rather
+than anything a caller chooses.
+---
+const Everything: String = "all"
+
+agent Watchlist {
+	key id: String
+
+	store targets: Map[Name, Target]
+
+	on call add(t: Target) -> Effect[()] {
+		do targets.put(t.name, t)
+	}
+
+	on call find(name: Name) -> Effect[Option[Target]] {
+		targets.get(name)
+	}
+
+	on call all() -> Effect[List[Target]] {
+		targets.sortBy((t) => t.name).collect()
+	}
+
+	--- Note a probe's result. Only a healthy answer moves `seenUp` on.
+	on call observe(name: Name, probe: Probe, at: Instant) -> Effect[()] {
+		let found <- targets.get(name)
+		match found {
+			None => (),
+			Some(t) => {
+				let up = match probe {
+					Answered(status) => isHealthy(status),
+					_ => false,
+				}
+				let seenUp = if up { at } else { t.seenUp }
+				do targets.put(name, Target { ...t, last: probe, seenUp: seenUp })
+			},
+		}
+	}
+
+	--- Stop watching every target that has been quiet too long, and say which.
+	on call retire(now: Instant) -> Effect[List[Name]] {
+		let gone <- targets.filter((t) => isAbandoned(t.seenUp, now)).map((t) => t.name).collect()
+		do gone.forEach((n) => {
+			do targets.remove(n)
+		})
+		gone
+	}
+}
+
+---
+Two schedules, one service. Nothing calls these handlers: the platform fires
+them, so there is no caller to answer and no principal. Each handler takes
+`at`, the schedule-aligned fire time in epoch milliseconds, and turns it into
+an `Instant` straight away.
+---
+service jobs from cron {
+	---
+	Every five minutes, probe each target. An upstream that is down is a result
+	to record, not a failed run, so a `FetchError` becomes `Unreachable` and the
+	run still returns `Ok`.
+	---
+	on schedule("*/5 * * * *") (at: Int) -> Effect[Result[(), String]] given Fetch {
+		let now = Instant.fromEpochMillis(at)
+		let targets <- Watchlist(Everything).all()
+		do targets.forEach((t) => {
+			let res <- Fetch.send(Request {
+				method: Get,
+				url: t.url,
+				contentType: None,
+				authorization: None,
+				headers: Map.empty(),
+				body: None,
+			})
+			let probe = match res {
+				Ok(r) => Answered(r.status),
+				Err(_) => Unreachable,
+			}
+			do Watchlist(Everything).observe(t.name, probe, now)
+		})
+		Ok(())
+	}
+
+	---
+	At 03:00 each day, retire targets with no healthy answer for `GiveUpAfter`.
+	The cut-off is measured from the scheduled time, not from when the run
+	happens to start, so a late start doesn't move it.
+	---
+	on schedule("0 3 * * *") (at: Int) -> Effect[Result[(), String]] given Logger {
+		let gone <- Watchlist(Everything).retire(Instant.fromEpochMillis(at))
+		do gone.forEach((n) => {
+			do Logger.info("stopped watching \(n)")
+		})
+		Ok(())
+	}
+}
+
+---
+Add a target and read it back. The HTTP side is small, but it is how anyone
+sees what the jobs did, and it lets a `system` suite drive the real Worker.
+---
+service api from http {
+	on POST("/targets") (body: NewTarget) -> Effect[HttpResult[Target]] by Visitor given Clock {
+		let now <- Clock.now()
+		let t = Target {
+			name: body.name,
+			url: body.url,
+			last: Unchecked,
+			seenUp: now,
+		}
+		do Watchlist(Everything).add(t)
+		Created(t)
+	}
+
+	on GET("/targets/:name") (name: Name) -> Effect[HttpResult[Target]] by Visitor {
+		let found <- Watchlist(Everything).find(name)
+		match found {
+			Some(t) => Ok(t),
+			None => NotFound,
+		}
+	}
+}

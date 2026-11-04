@@ -1,0 +1,122 @@
+context warehouse.packing
+
+consumes bynk { Logger }
+consumes bynk.cloudflare { Queue }
+
+--- A stock-keeping unit, such as `MUG-001`.
+type Sku = String where Matches("[A-Z]{3}-[0-9]{3}")
+
+--- How many of one item a single order may ask for.
+type Quantity = Int where InRange(1, 99)
+
+--- An order as a customer posts it. The HTTP boundary checks both refinements.
+type Order = {
+	sku: Sku,
+	quantity: Quantity,
+}
+
+---
+A packing job, as it travels on the queue. Its fields are deliberately plain.
+Nothing checks that a producer's message matches this type, and a message
+that fails to decode is retried until the queue's dead-letter policy takes it.
+Keeping the wire shape loose lets the consumer admit the values itself and
+drop a job that can never succeed, instead of retrying it.
+---
+type PackJob = {
+	sku: String,
+	quantity: Int,
+}
+
+--- The producer side of the `packing` queue.
+capability Packing = Queue @name("packing")
+
+--- One shelf per SKU: how many items are waiting to be packed.
+agent Shelf {
+	key sku: Sku
+
+	store onHand: Cell[Int]
+
+	on call restock(quantity: Quantity) -> Effect[Int] {
+		let _ <- onHand.update((n) => n + quantity)
+		onHand
+	}
+
+	--- Takes `quantity` items if the shelf holds that many, and reports whether it did.
+	on call take(quantity: Quantity) -> Effect[Bool] {
+		if onHand < quantity {
+			false
+		} else {
+			let _ <- onHand.update((n) => n - quantity)
+			true
+		}
+	}
+
+	on call count() -> Effect[Int] {
+		onHand
+	}
+}
+
+service api from http {
+	---
+	Enqueues the order and answers at once; the packer does the work later.
+	The send is awaited with `let _ <-`: replying `Accepted` before the message is
+	on the queue would promise work that might never happen. The log line is
+	fire-and-forget with `~>`, since nothing depends on it finishing.
+	---
+	on POST("/orders") (
+		body: Order
+	) -> Effect[HttpResult[String]] by Visitor given Packing, Logger {
+		let _ <- Packing.sendValue(PackJob { sku: body.sku, quantity: body.quantity })
+		~> Logger.info("queued \(body.quantity) x \(body.sku)")
+		Accepted("queued")
+	}
+
+	---
+	Restocks a shelf. A real warehouse would guard this with an actor; here it
+	sets the scene for the tests.
+	---
+	on POST("/stock/:sku") (sku: Sku, body: Quantity) -> Effect[HttpResult[Int]] by Visitor {
+		let n <- Shelf(sku).restock(body)
+		Ok(n)
+	}
+
+	on GET("/stock/:sku") (sku: Sku) -> Effect[HttpResult[Int]] by Visitor {
+		let n <- Shelf(sku).count()
+		Ok(n)
+	}
+}
+
+service packer from queue("packing") {
+	---
+	Each delivery ends in a verdict, never an ack call. `Ack` removes the message;
+	`Retry(reason)` asks the platform to deliver it again later.
+
+	- Enough stock: take it and `Ack`.
+	- Not enough stock yet: `Retry`, since a restock may arrive before the next try.
+	- A job that can never be packed: `Ack` to drop it, because retrying a poison
+	  message only delays the dead-letter queue.
+	---
+	on message(job: PackJob) -> Effect[QueueResult] given Logger {
+		match Sku.of(job.sku) {
+			Err(_) => {
+				~> Logger.warn("dropping a job for unknown SKU \(job.sku)")
+				Ack
+			},
+			Ok(sku) => match Quantity.of(job.quantity) {
+				Err(_) => {
+					~> Logger.warn("dropping a job for \(job.quantity) x \(sku)")
+					Ack
+				},
+				Ok(quantity) => {
+					let taken <- Shelf(sku).take(quantity)
+					if taken {
+						~> Logger.info("packed \(quantity) x \(sku)")
+						Ack
+					} else {
+						Retry("not enough \(sku) in stock")
+					}
+				},
+			},
+		}
+	}
+}

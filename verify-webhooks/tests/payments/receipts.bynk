@@ -1,0 +1,57 @@
+---
+Receipts are our own signed data, so these cases check the HMAC itself. They run
+at the default `unit` tier with the real cryptography: an HMAC is deterministic,
+so a fake would prove nothing. Below `system` the signature check is skipped,
+so `by Processor` here just reaches the handler.
+---
+suite payments.hooks {
+	env {
+		RECEIPT_KEY = "test-receipt-key"
+	}
+
+	case "the webhook's receipt verifies for its payment" {
+		let r <- webhooks.POST("/webhooks/payment", Payment {
+			id: "pay_1",
+			amountPence: 1250,
+		}) by Processor
+		match r {
+			Ok(receipt) => {
+				let valid <- verifyReceipt.call("pay_1", receipt)
+				expect valid
+			},
+			_ => expect false,
+		}
+	}
+
+	case "a receipt does not verify for a different payment" {
+		let issued <- receiptFor("pay_1")
+		match issued {
+			Some(receipt) => {
+				let valid <- verifyReceipt.call("pay_2", receipt)
+				expect !valid
+			},
+			None => expect false,
+		}
+	}
+
+	case "a receipt that isn't hex does not verify" {
+		let valid <- verifyReceipt.call("pay_1", "not-hex")
+		expect !valid
+	}
+}
+
+--- With no `RECEIPT_KEY` set, nothing is signed.
+suite payments.hooks {
+	case "no receipt is issued without a key" {
+		let issued <- receiptFor("pay_1")
+		expect issued is None
+	}
+
+	case "the webhook answers 503 without a key" {
+		let r <- webhooks.POST("/webhooks/payment", Payment {
+			id: "pay_1",
+			amountPence: 1250,
+		}) by Processor
+		expect r is ServiceUnavailable(_)
+	}
+}

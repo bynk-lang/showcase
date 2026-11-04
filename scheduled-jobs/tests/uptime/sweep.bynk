@@ -1,0 +1,29 @@
+// At `system` the schedule fires through the deployed Worker's real `scheduled`
+// entry point. A `stub` isn't allowed here, so these cases drive only the sweep,
+// which never calls `Fetch`, and read its effect back over HTTP.
+suite uptime.monitor as system {
+	case "one sweep retires a target quiet for a day and keeps a newer one" {
+		advance Clock by 3.hours
+		let _ <- api.POST("/targets", NewTarget {
+			name: "blog",
+			url: "https://blog.test",
+		}) by Visitor
+		advance Clock by 5.minutes
+		let _ <- api.POST("/targets", NewTarget {
+			name: "shop",
+			url: "https://shop.test",
+		}) by Visitor
+		// 03:00 on day 1: exactly a day after `blog` was added, five minutes short for `shop`
+		let r <- jobs.schedule("0 3 * * *", 97200000)
+		expect r is Ok(_)
+		let blog <- api.GET("/targets/:name", "blog") by Visitor
+		expect blog is NotFound
+		let shop <- api.GET("/targets/:name", "shop") by Visitor
+		expect shop is Ok(_)
+	}
+
+	case "with nothing to watch the sweep has nothing to do" {
+		let r <- jobs.schedule("0 3 * * *", 97200000)
+		expect r is Ok(_)
+	}
+}

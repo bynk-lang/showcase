@@ -1,0 +1,41 @@
+suite shop.web as system
+
+// At the system tier the real Worker runs with its own `Locale` provider,
+// so these cases exercise `Accept-Language` negotiation itself.
+
+case "a regional tag is truncated to the declared language" {
+	let r <- api.GET(
+		"/basket",
+		BasketQuery { items: 2 },
+		RequestHeaders.of(["Accept-Language: fr-CA, en;q=0.5"])
+	) by Visitor
+	expect r == Ok("2 articles dans votre panier")
+}
+
+case "quality values pick the preferred declared language" {
+	let r <- api.GET(
+		"/basket",
+		BasketQuery { items: 1 },
+		RequestHeaders.of(["Accept-Language: fr;q=0.3, pl;q=0.9"])
+	) by Visitor
+	expect r == Ok("1 produkt w koszyku")
+}
+
+case "unsupported languages fall back to English" {
+	let r <- api.GET(
+		"/basket",
+		BasketQuery { items: 2 },
+		RequestHeaders.of(["Accept-Language: de-DE, ja"])
+	) by Visitor
+	expect r == Ok("2 items in your basket")
+}
+
+case "no header at all falls back to English" {
+	let r <- api.GET("/basket", BasketQuery { items: 0 }, RequestHeaders.empty()) by Visitor
+	expect r == Ok("0 items in your basket")
+}
+
+case "a negative count is rejected before any text is rendered" {
+	let r <- api.GET("/basket", Wire("?items=-1"), RequestHeaders.empty()) by Visitor
+	expect r is Rejected(RefinementViolation(_))
+}
