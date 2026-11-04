@@ -1,0 +1,67 @@
+---
+A support desk's ticket queue. The types opt in to an order with
+`derives Ord`, which is all it takes for the generic code in
+`triage.generic` and `bynk.list` to sort, rank and clamp them.
+---
+commons triage.tickets
+
+uses bynk.list
+uses triage.generic
+
+---
+How urgent a ticket is. An enum orders by variant position, so `Urgent` is
+written first to make it the *smallest*: ascending order is then the order
+to work in.
+---
+type Priority = enum { Urgent, Normal, Low } derives Ord
+
+---
+Who owns a ticket. A record of `String`s is a `Key` automatically, so it can
+key a `Map` with nothing to declare. It `derives Ord` only because `Ticket`
+does, and every field of an ordered record must be orderable.
+---
+type Team = {
+	product: String,
+	region: String,
+} derives Ord
+
+---
+A ticket orders by its fields in declaration order: priority first, then
+the oldest, then the id. Ids are unique, so `team` never decides anything.
+Reordering these fields changes the queue.
+---
+type Ticket = {
+	priority: Priority,
+	--- Minutes since the shift started.
+	opened: Int,
+	id: String,
+	team: Team,
+} derives Ord
+
+--- The ticket to pick up next: the smallest one, so `min`, not `max`.
+fn nextUp(ts: List[Ticket]) -> Option[Ticket] {
+	min(ts)
+}
+
+--- The whole queue, in working order.
+fn worklist(ts: List[Ticket]) -> Sorted[Ticket] {
+	Sorted.fromList(ts)
+}
+
+--- How many tickets are urgent.
+fn urgentCount(ts: List[Ticket]) -> Int {
+	occurrences(ts.map((t) => t.priority), Urgent)
+}
+
+---
+The priority an automatic rule may set: never `Urgent`, which only a person
+can choose. The generic `clamp` works on `Priority` because it `derives Ord`.
+---
+fn automatic(p: Priority) -> Priority {
+	clamp(p, Normal, Low)
+}
+
+--- Open tickets per team, keyed by the `Team` record itself.
+fn load(ts: List[Ticket]) -> Map[Team, Int] {
+	countBy(ts, (t) => t.team)
+}

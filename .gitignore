@@ -3,3 +3,6 @@ out/
 out-js/
 node_modules/
 .wrangler/
+# Showcase projects are never deployed, so `bynk dev` lock files are noise.
+bynk.schema.lock
+bynk.deploy.lock

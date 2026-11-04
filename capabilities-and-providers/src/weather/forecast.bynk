@@ -1,0 +1,28 @@
+commons weather.forecast
+
+---
+A city name as the forecast service spells it: up to four lowercase words
+joined by single hyphens, such as `london` or `stoke-on-trent`. Refining it here means a `City` is always safe
+to put in a URL path, so the provider never has to escape it.
+---
+type City = String where Matches("[a-z]+(-[a-z]+){0,3}") && MaxLength(40)
+
+---
+Today's forecast for one city, as the upstream API returns it.
+---
+type Forecast = {
+	city: String,
+	highC: Int,
+	summary: String,
+}
+
+---
+One line of advice for the day. Pure, so it needs no capability at all.
+---
+fn advice(f: Forecast) -> String {
+	if f.highC < 5 {
+		"\(f.city): \(f.highC)°C, \(f.summary). Wrap up warm."
+	} else {
+		"\(f.city): \(f.highC)°C, \(f.summary)."
+	}
+}

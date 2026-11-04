@@ -1,0 +1,48 @@
+suite orders.stock {
+	case "a new line starts at one" {
+		expect firstQuantity() == 1
+	}
+
+	case "a quantity's bounds are inclusive" {
+		expect Quantity.of(1) is Ok(_)
+		expect Quantity.of(99) is Ok(_)
+	}
+
+	case "a quantity outside its range is rejected" {
+		expect Quantity.of(0) is Err(_)
+		expect Quantity.of(100) is Err(_)
+	}
+
+	case "a sku must match its pattern" {
+		expect Sku.of("TEA-0042") is Ok(_)
+		expect Sku.of("tea-0042") is Err(_)
+		expect Sku.of("TEA-42") is Err(_)
+	}
+
+	case "a line is priced without re-validating" {
+		let line = Line {
+			sku: "TEA-0042",
+			qty: 3,
+		}
+		expect linePrice(line) == 750
+	}
+
+	case "adding one inside the range succeeds" {
+		let line = Line {
+			sku: "TEA-0042",
+			qty: 98,
+		}
+		expect addOne(line) is Ok(_)
+	}
+
+	case "adding one past the range is an error, not a bad Line" {
+		let line = Line {
+			sku: "TEA-0042",
+			qty: 99,
+		}
+		match addOne(line) {
+			Ok(_) => expect false,
+			Err(e) => expect e.message.length() > 0,
+		}
+	}
+}

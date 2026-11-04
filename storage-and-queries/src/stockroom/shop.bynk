@@ -1,0 +1,114 @@
+context stockroom.shop
+
+uses stockroom.goods
+consumes bynk { Clock }
+
+--- Why a restock can fail.
+type StockError = enum { UnknownSku }
+
+---
+One shop's stockroom (a Cloudflare Durable Object per `branch`). It keeps three
+kinds of storage, each chosen for how the data lives:
+
+- `products` is a `Map`: the catalogue, read through lazy `Query` chains.
+  `@indexed(by: aisle)` keeps a secondary index, so the "what's in drinks?"
+  filter becomes a lookup instead of a scan, with no change to the query text.
+- `holds` is a `Cache`: an item set aside for a customer lapses on its own after
+  `@ttl(15.minutes)`, with no sweep job.
+- `deliveries` is a `Log`: an append-only history that `@retain(30.days)` trims
+  as it grows.
+---
+agent Stockroom {
+	key branch: String
+
+	store products: Map[Sku, Product] @indexed(by: aisle)
+	store holds: Cache[HoldCode, Sku] @ttl(15.minutes)
+	store deliveries: Log[Delivery] @retain(30.days)
+
+	on call shelve(product: Product) -> Effect[()] {
+		do products.put(product.sku, product)
+	}
+
+	---
+	Take a delivery. `Log.append` stamps the time, so this handler declares
+	`given Clock` even though nothing in its body names the clock.
+	---
+	on call restock(sku: Sku, qty: Qty) -> Effect[Result[Product, StockError]] given Clock {
+		let found <- products.get(sku)
+		match found {
+			None => Err(UnknownSku),
+			Some(p) => {
+				// Arithmetic drops the refinement, so the sum goes back through `Count.of`.
+				let Ok(onHand) = Count.of(p.onHand + qty) else match {
+					Err(_) => unreachable("a count plus a positive quantity is never negative"),
+				}
+				let restocked = Product {
+					...p,
+					onHand: onHand,
+				}
+				do products.put(sku, restocked)
+				do deliveries.append(Delivery { sku: sku, qty: qty })
+				Ok(restocked)
+			},
+		}
+	}
+
+	--- An aisle's products, cheapest first. The equality filter routes through the `@indexed` aisle.
+	on call aisle(name: Aisle) -> Effect[List[Product]] {
+		products.filter((p) => p.aisle == name).sortBy((p) => p.priceCents).collect()
+	}
+
+	--- The SKUs running low, emptiest shelf first.
+	on call lowStock(below: Int) -> Effect[List[Sku]] {
+		products.filter((p) => p.onHand < below).sortBy((p) => p.onHand).map((p) => p.sku).collect()
+	}
+
+	--- What the stock on the shelves is worth, in cents.
+	on call stockValue() -> Effect[Int] {
+		products.sum((p) => p.priceCents * p.onHand)
+	}
+
+	--- One row per aisle: how many products it carries and how many units.
+	on call byAisle() -> Effect[List[AisleStock]] {
+		products.groupBy((p) => p.aisle, (a, rows) => AisleStock {
+			aisle: a,
+			products: rows.count(),
+			units: rows.sum((r) => r.onHand),
+		}).sortBy((s) => s.aisle).collect()
+	}
+
+	--- Set one item aside under `code`. `put` stamps its expiry, so it needs the clock.
+	on call hold(code: HoldCode, sku: Sku) -> Effect[()] given Clock {
+		do holds.put(code, sku)
+	}
+
+	--- The item held under `code`, or `None` once the hold has lapsed.
+	on call held(code: HoldCode) -> Effect[Option[Sku]] given Clock {
+		holds.get(code)
+	}
+
+	---
+	How many deliveries arrived at or after `t`. A window read takes its cutoff as
+	an argument, so it needs no clock.
+	---
+	on call deliveriesSince(t: Instant) -> Effect[Int] {
+		deliveries.since(t).count()
+	}
+}
+
+service api from http {
+	on POST("/products") (body: Product) -> Effect[HttpResult[Product]] by Visitor {
+		do Stockroom("high-street").shelve(body)
+		Created(body)
+	}
+
+	on GET("/stock/low") () -> Effect[HttpResult[List[Sku]]] by Visitor {
+		let rows <- Stockroom("high-street").lowStock(5)
+		Ok(rows)
+	}
+
+	on GET("/stock/value") () -> Effect[HttpResult[Int]] by Visitor {
+		let cents <- Stockroom("high-street").stockValue()
+		Ok(cents)
+	}
+}

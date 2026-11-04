@@ -1,0 +1,12 @@
+suite till.menu {
+	case "a lookup finds a product, or nothing" {
+		expect findProduct("TEA") is Some(_)
+		expect findProduct("LATTE") == None
+	}
+
+	case "only a known card earns a discount" {
+		expect discountFor(Some("L-2002")) == 25
+		expect discountFor(Some("L-9999")) == 0
+		expect discountFor(None) == 0
+	}
+}

@@ -1,0 +1,114 @@
+suite stockroom.shop
+
+// Suite helpers are pure, so they build the products and each case shelves them.
+fn tea() -> Product {
+	Product {
+		sku: "tea",
+		aisle: "drinks",
+		priceCents: 350,
+		onHand: 12,
+	}
+}
+
+fn cola() -> Product {
+	Product {
+		sku: "cola",
+		aisle: "drinks",
+		priceCents: 120,
+		onHand: 2,
+	}
+}
+
+fn oats() -> Product {
+	Product {
+		sku: "oats",
+		aisle: "breakfast",
+		priceCents: 200,
+		onHand: 4,
+	}
+}
+
+case "queries filter, sort, aggregate and group the catalogue" {
+	do Stockroom("a").shelve(tea())
+	do Stockroom("a").shelve(cola())
+	do Stockroom("a").shelve(oats())
+	// a handler's List result compares directly, element by element
+	let drinks <- Stockroom("a").aisle("drinks")
+	expect drinks.map((p) => p.sku) == ["cola", "tea"]
+	let frozen <- Stockroom("a").aisle("frozen")
+	expect frozen == []
+	// strictly below the threshold: oats, with exactly 4, joins only at 5
+	let low <- Stockroom("a").lowStock(4)
+	expect low == ["cola"]
+	let lower <- Stockroom("a").lowStock(5)
+	expect lower == ["cola", "oats"]
+	let cents <- Stockroom("a").stockValue()
+	expect cents == 350 * 12 + 120 * 2 + 200 * 4
+	let report <- Stockroom("a").byAisle()
+	expect report == [
+		AisleStock {
+			aisle: "breakfast",
+			products: 1,
+			units: 4,
+		},
+		AisleStock {
+			aisle: "drinks",
+			products: 2,
+			units: 14,
+		},
+	]
+}
+
+case "an empty stockroom aggregates to zero" {
+	let cents <- Stockroom("empty").stockValue()
+	expect cents == 0
+	let report <- Stockroom("empty").byAisle()
+	expect report == []
+}
+
+case "a restock adds units and logs one timestamped delivery" {
+	do Stockroom("b").shelve(cola())
+	let r <- Stockroom("b").restock("cola", 10)
+	expect r is Ok(Product { onHand: 12, .. })
+	// the delivery was stamped at the test clock's epoch, so a later cutoff
+	// misses it; the window reads themselves never touch the clock
+	let all <- Stockroom("b").deliveriesSince(Instant.fromEpochMillis(0))
+	expect all == 1
+	let later <- Stockroom("b").deliveriesSince(Instant.fromEpochMillis(1000))
+	expect later == 0
+	expect Clock.now called once
+}
+
+case "restocking an unknown product is refused and logs nothing" {
+	let r <- Stockroom("c").restock("caviar", 1)
+	expect r == Err(UnknownSku)
+	let n <- Stockroom("c").deliveriesSince(Instant.fromEpochMillis(0))
+	expect n == 0
+}
+
+case "a hold is collectable up to the last millisecond of its 15 minutes" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(899999)]
+	do Stockroom("d").hold("ANN-1", "tea")
+	let item <- Stockroom("d").held("ANN-1")
+	expect item == Some("tea")
+}
+
+case "a hold has lapsed at exactly 15 minutes" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(900000)]
+	do Stockroom("e").hold("ANN-1", "tea")
+	let item <- Stockroom("e").held("ANN-1")
+	expect item is None
+}
+
+case "the http surface values the stock and flags low shelves" {
+	let _ <- api.POST("/products", Product {
+		sku: "tea",
+		aisle: "drinks",
+		priceCents: 350,
+		onHand: 2,
+	}) by Visitor
+	let value <- api.GET("/stock/value") by Visitor
+	expect value is Ok(700)
+	let low <- api.GET("/stock/low") by Visitor
+	expect low is Ok(["tea"])
+}

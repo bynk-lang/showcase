@@ -1,0 +1,58 @@
+commons orders.stock
+
+---
+A stock-keeping unit: three capital letters, a dash, four digits.
+
+The pattern is part of the type, so a function that takes a `Sku` never
+has to ask whether the string is well formed.
+---
+type Sku = String where Matches("[A-Z]{3}-[0-9]{4}")
+
+--- How many of one item a single order line may ask for.
+type Quantity = Int where InRange(1, 99)
+
+---
+One line of an order.
+
+Both fields are refined, so a `Line` that exists is already valid. This is
+also the shape of the HTTP body: the boundary checks it before any handler runs.
+---
+type Line = {
+	sku: Sku,
+	qty: Quantity,
+}
+
+--- What one unit of any item costs, in pence.
+const UnitPence: Int = 250
+
+---
+The quantity a new line starts with.
+
+`1` is a literal in a `Quantity` position, so the compiler checks it against
+`InRange(1, 99)` and admits it: no `.of`, no `Result`. Writing `0` here
+would be a compile error.
+---
+fn firstQuantity() -> Quantity {
+	1
+}
+
+---
+The price of a line, in pence.
+
+No validation here: a `Quantity` is between 1 and 99 by construction.
+---
+fn linePrice(line: Line) -> Int {
+	line.qty * UnitPence
+}
+
+---
+The same line with one more unit.
+
+Arithmetic on a refined value yields its base type, so `line.qty + 1` is a
+plain `Int` that may be 100. It has to go back through `Quantity.of`, which
+returns a `Result` the caller must handle.
+---
+fn addOne(line: Line) -> Result[Line, ValidationError] {
+	let qty = Quantity.of(line.qty + 1)?
+	Ok(Line { sku: line.sku, qty: qty })
+}

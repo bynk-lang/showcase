@@ -1,0 +1,15 @@
+// A `system` suite sends raw JSON, so it reaches the boundary checks a typed value would skip.
+suite stockroom.shop as system {
+	case "a negative price or count is refused before it reaches storage" {
+		let price <- api.POST(
+			"/products",
+			Wire("{\"sku\": \"tea\", \"aisle\": \"drinks\", \"priceCents\": -350, \"onHand\": 2}")
+		) by Visitor
+		expect price is Rejected(RefinementViolation(_))
+		let count <- api.POST(
+			"/products",
+			Wire("{\"sku\": \"tea\", \"aisle\": \"drinks\", \"priceCents\": 350, \"onHand\": -2}")
+		) by Visitor
+		expect count is Rejected(RefinementViolation(_))
+	}
+}
