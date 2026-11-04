@@ -1,4 +1,5 @@
 .bynk/
+.claude/worktrees
 out/
 out-js/
 node_modules/
