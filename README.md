@@ -1,0 +1,61 @@
+# Bynk showcase
+
+Small, focused Bynk projects. Each one shows a single language feature, or a
+small group of closely related ones, written the way Bynk is meant to be
+written. If you're new to Bynk, read these to see what idiomatic code looks
+like.
+
+Every project stands on its own. Each has its own `bynk.toml`, sources, tests
+and a README covering what the feature is, why Bynk does it that way, and what
+to read next in [the book](https://bynk-lang.org/book/).
+
+## Projects
+
+| Project | Shows | Book |
+|---|---|---|
+| [`refined-types`](refined-types/) | refined types, literal admission, validating at the boundary | [Define and validate](https://bynk-lang.org/book/guides/type-system/define-and-validate/) |
+| [`results-and-optionals`](results-and-optionals/) | `Result`, optionals, and propagating failure | [Result and optionals](https://bynk-lang.org/book/guides/type-system/result-and-optionals/) |
+| [`pattern-matching`](pattern-matching/) | `match` on records, lists and ranges; narrowing with `is` | [Match](https://bynk-lang.org/book/guides/type-system/match/) |
+| [`generics`](generics/) | generic types and functions, `Eq`/`Ord` bounds, ordering your own types | [Generics](https://bynk-lang.org/book/reference/generics/) |
+| [`capabilities-and-providers`](capabilities-and-providers/) | `given`, declaring a capability, providing and wrapping one | [The capability model](https://bynk-lang.org/book/guides/effects-and-capabilities/understand-the-capability-model/) |
+| [`agent-state-machine`](agent-state-machine/) | agents, a `Cell`, and invariants | [State machine](https://bynk-lang.org/book/guides/agents-and-state/state-machine/) |
+| [`storage-and-queries`](storage-and-queries/) | agent storage (`Map`, `Cache`, `Log`) and `Query[T]` | [Agents](https://bynk-lang.org/book/reference/agents/) |
+| [`testing`](testing/) | tests in the language: stubs, platform doubles, fixtures | [Write tests](https://bynk-lang.org/book/guides/testing/write-tests/) |
+
+More are on the way, covering concurrency, actors, entry points, events,
+localisation and program structure.
+
+## Running a project
+
+[Install Bynk](https://bynk-lang.org/book/introduction/install/) at the
+version in [`BYNK_VERSION`](BYNK_VERSION). Then, from a project's directory:
+
+```sh
+bynkc test .      # run its tests
+bynk dev          # serve it locally, if it has an HTTP context
+```
+
+## What counts as Bynkish here
+
+CI holds every project to the same bar:
+
+- **Canonical formatting.** `bynkc fmt --check` passes, so the formatter's
+  output is the house style.
+- **It type-checks.** `bynkc check` is clean.
+- **The feature is tested.** `bynkc test` exercises the feature the project
+  is about, not just the code around it.
+- **It's small.** A project shows one idea. If a project needs a second idea,
+  that idea gets its own project.
+
+## Compatibility
+
+[`BYNK_VERSION`](BYNK_VERSION) pins the release CI checks against. The
+[org canary](https://github.com/bynk-lang/.github/blob/main/canary/README.md)
+re-runs every project against each new Bynk release. It opens a `canary`
+issue if a project breaks, and a pull request moving the pin once a newer
+release passes.
+
+## Licence
+
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+your option.

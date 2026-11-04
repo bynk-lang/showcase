@@ -1,0 +1,47 @@
+# Bynk canary: re-run every showcase project's checks against a new Bynk
+# release, and keep a `canary` issue open while they fail.
+#
+# Triggered by the org dispatcher in bynk-lang/.github (on each Bynk release,
+# and weekly), which is why there is no `schedule` here. See
+# https://github.com/bynk-lang/.github/blob/main/canary/README.md
+#
+# canary.yml checks one project, and this repository has many, so the
+# per-project gate runs here (checks.yml) at the dispatched version and
+# canary.yml takes its result as `upstream-result`: one report to the compat
+# board and one `canary` issue cover every project.
+name: Bynk canary
+
+on:
+  repository_dispatch:
+    types: [bynk-canary]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Bynk version, exact ("0.330.4") or "latest"
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write   # canary.yml reports with the run's GitHub OIDC token
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+    with:
+      version: ${{ github.event.client_payload.version || inputs.version || 'latest' }}
+
+  canary:
+    name: Canary
+    needs: checks
+    if: ${{ !cancelled() }}
+    uses: bynk-lang/.github/.github/workflows/canary.yml@v1
+    with:
+      version: ${{ github.event.client_payload.version || inputs.version || 'latest' }}
+      upstream-result: ${{ needs.checks.result }}
+      kind: example
+      ci: false             # checks.yml ran the gate on every project
+      bump: true            # propose moving BYNK_VERSION to a newer release that passes
+    secrets: inherit        # the bump App's BUMP_APP_ID and BUMP_APP_KEY

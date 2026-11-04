@@ -1,0 +1,16 @@
+# Format check, type check, and tests on every showcase project, at the
+# pinned BYNK_VERSION, with diagnostics annotated on PRs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Check
+    uses: ./.github/workflows/checks.yml

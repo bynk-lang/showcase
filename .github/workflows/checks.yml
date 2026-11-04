@@ -1,0 +1,53 @@
+# The standard Bynk gate (format check, type check, tests) run on every
+# showcase project: each top-level directory with a bynk.toml. Called by
+# ci.yml at the pinned BYNK_VERSION and by bynk-canary.yml at a dispatched
+# release.
+name: Checks
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Bynk version to install; empty to read BYNK_VERSION.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  projects:
+    name: Find projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: find
+        run: |
+          projects="$(find . -mindepth 2 -maxdepth 2 -name bynk.toml -printf '%h\n' \
+            | sed 's|^\./||' | sort | jq -Rnc '[inputs]')"
+          echo "projects=${projects}" >> "$GITHUB_OUTPUT"
+          echo "Projects: ${projects}"
+
+  check:
+    name: ${{ matrix.project }}
+    needs: projects
+    if: needs.projects.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.projects.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: bynk-lang/bynk-ci@v1
+        with:
+          version: ${{ inputs.version }}
+          version-file: ${{ inputs.version == '' && 'BYNK_VERSION' || '' }}
+          working-directory: ${{ matrix.project }}
+          source: .
