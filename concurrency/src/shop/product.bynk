@@ -1,0 +1,66 @@
+context shop.product
+
+consumes bynk { TimedOut }
+
+--- How many of a product are on the shelf.
+capability Stock {
+	fn level(sku: Int) -> Effect[Int]
+}
+
+---
+A price, in whole pounds. The same catalogue is served from two regional
+mirrors, so either can answer for any product.
+---
+capability Prices {
+	fn get(region: String, sku: Int) -> Effect[Int]
+}
+
+--- The courier's delivery estimate, in days.
+capability Couriers {
+	fn estimate(sku: Int) -> Effect[Int]
+}
+
+---
+How long the page waits for a delivery estimate. The estimate is a nicety, so
+the page renders without it rather than hang on a slow courier.
+---
+const EstimateBudget: Duration = 2.seconds
+
+---
+Ask both mirrors and take the first to answer. Prices are read-only, so doing
+the lookup twice is safe: `race` does not cancel the loser, it lets it run to
+completion after the page is served.
+---
+fn fastestPrice(sku: Int) -> Effect[Int] given Prices {
+	Prices.get("east", sku).race(Prices.get("west", sku))
+}
+
+---
+The delivery line, bounded by `EstimateBudget`. A timeout stops the page
+waiting, not the courier: the abandoned call still runs to the end.
+---
+fn deliveryNote(sku: Int) -> Effect[String] given Couriers {
+	let r <- Couriers.estimate(sku).within(EstimateBudget)
+	match r {
+		Ok(days) => Effect.pure("delivery in \(days) days"),
+		Err(TimedOut { .. }) => Effect.pure("delivery date to follow"),
+	}
+}
+
+service page {
+	---
+	The product page. Its three lookups do not need each other's results, so a
+	`par` block issues them together and the page costs the slowest of them, not
+	the sum. If one faults, the block still waits for the other two to settle
+	before it raises, so nothing it started outlives the handler.
+	---
+	on call(sku: Int) -> Effect[String] given Stock, Prices, Couriers {
+		par {
+			let stock <- Stock.level(sku)
+			let price <- fastestPrice(sku)
+			let delivery <- deliveryNote(sku)
+		}
+		let shelf = if stock > 0 { "\(stock) in stock" } else { "out of stock" }
+		Effect.pure("£\(price), \(shelf), \(delivery)")
+	}
+}

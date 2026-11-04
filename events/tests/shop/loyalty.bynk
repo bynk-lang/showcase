@@ -1,0 +1,51 @@
+---
+The subscriber's side. `AwardPoints.event(e)` delivers one event through the
+service's generated handler, the path the fan-out uses, so the header's
+pattern filter applies. No checkout is involved.
+---
+suite shop.loyalty
+
+--- An order where only the region matters to the case.
+fn order(region: Region) -> OrderPlaced {
+	OrderPlaced {
+		orderId: "o-1",
+		customer: "ada",
+		region: region,
+		totalPence: 2599,
+	}
+}
+
+case "a domestic order earns a point per whole pound" {
+	let _ <- AwardPoints.event(order(Region.Domestic))
+	let points <- Points("ada").current()
+	expect points == 25
+}
+
+case "an international order is filtered out before the handler runs" {
+	let _ <- AwardPoints.event(order(Region.International))
+	let points <- Points("ada").current()
+	expect points == 0
+	expect Idempotency.dedup called 0 times
+}
+
+case "a redelivered emission earns nothing the second time" {
+	let env = EventEnvelope {
+		eventId: "evt-1",
+		publisherId: "shop.orders",
+		emittedAt: Instant.fromEpochMillis(0),
+		schemaVersion: 1,
+	}
+	let _ <- AwardPoints.event(order(Region.Domestic), env)
+	let _ <- AwardPoints.event(order(Region.Domestic), env)
+	let points <- Points("ada").current()
+	expect points == 25
+	expect Idempotency.remember called once
+}
+
+case "two emissions of the same order are two awards" {
+	// With no envelope, each delivery gets a fresh `eventId`.
+	let _ <- AwardPoints.event(order(Region.Domestic))
+	let _ <- AwardPoints.event(order(Region.Domestic))
+	let points <- Points("ada").current()
+	expect points == 50
+}

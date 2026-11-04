@@ -1,0 +1,76 @@
+context blog.authors
+
+--- An author's handle. `Author` mints it from a verified token's `sub` claim, so a token whose `sub` is empty is refused with a `401`.
+type UserId = String where NonEmpty
+
+--- The short bio shown on an author's page.
+type Bio = String where NonEmpty && MaxLength(280)
+
+type BioUpdate = {
+	bio: Bio,
+}
+
+---
+A signed-in author: a JWT verified at the boundary. A missing, forged or
+expired token is a `401` before any handler runs.
+---
+actor Author { auth = Bearer(secret = "AUTH_JWT_SECRET"), identity = UserId }
+
+---
+An author whose token also carries a `moderator` claim. A plain author's token
+is authenticated but not permitted, so it gets a `403`, not a `401`.
+---
+actor Moderator = Author where hasClaim("moderator")
+
+---
+One author's bio, keyed by their handle. `PUT /me/bio` addresses
+`Bios(a.identity)`, the handle from the verified token, so an author can change
+their own bio and no one else's: the route has no user-id parameter to forge.
+---
+agent Bios {
+	key author: UserId
+
+	store bio: Cell[Option[Bio]]
+
+	on call read() -> Effect[Option[Bio]] {
+		bio
+	}
+
+	on call write(text: Bio) -> Effect[()] {
+		bio := Some(text)
+	}
+
+	on call clear() -> Effect[()] {
+		bio := None
+	}
+}
+
+---
+Public unless stated otherwise: the header's `by Visitor` is the default actor,
+and a handler that names its own `by` overrides it.
+---
+service api from http by Visitor {
+	--- Anyone may read any author's bio.
+	on GET("/authors/:id/bio") (id: UserId) -> Effect[HttpResult[Bio]] {
+		let found <- Bios(id).read()
+		match found {
+			Some(text) => Ok(text),
+			None => NotFound,
+		}
+	}
+
+	--- Only a signed-in author may write, and only their own bio.
+	on PUT("/me/bio") (body: BioUpdate) -> Effect[HttpResult[Bio]] by a: Author {
+		do Bios(a.identity).write(body.bio)
+		Ok(body.bio)
+	}
+
+	---
+	Only a moderator may clear an author's bio. There is no binder: the route
+	checks the claim but never needs to know which moderator called.
+	---
+	on DELETE("/authors/:id/bio") (id: UserId) -> Effect[HttpResult[String]] by Moderator {
+		do Bios(id).clear()
+		NoContent
+	}
+}

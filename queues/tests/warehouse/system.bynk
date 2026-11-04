@@ -1,0 +1,48 @@
+// At `system`, each message is serialised, sent through a JSON round trip and
+// delivered through the Worker's real `queue` entry point. State carries
+// through a case, so an HTTP read sees what the consumer wrote.
+suite warehouse.packing as system {
+	case "a job is packed and acknowledged when the shelf has enough" {
+		let _ <- api.POST("/stock/:sku", "MUG-001", 5) by Visitor
+		let r <- packer.message(PackJob { sku: "MUG-001", quantity: 3 })
+		expect r is Ack
+		let left <- api.GET("/stock/:sku", "MUG-001") by Visitor
+		expect left is Ok(2)
+	}
+
+	case "a job waits for stock, then is packed on redelivery" {
+		let first <- packer.message(PackJob { sku: "MUG-001", quantity: 3 })
+		expect first is Retry("not enough MUG-001 in stock")
+		let _ <- api.POST("/stock/:sku", "MUG-001", 3) by Visitor
+		let second <- packer.message(PackJob { sku: "MUG-001", quantity: 3 })
+		expect second is Ack
+		let left <- api.GET("/stock/:sku", "MUG-001") by Visitor
+		expect left is Ok(0)
+	}
+
+	case "a job for an unknown SKU is dropped, and touches no stock" {
+		let _ <- api.POST("/stock/:sku", "MUG-001", 5) by Visitor
+		let r <- packer.message(PackJob { sku: "mug-1", quantity: 1 })
+		expect r is Ack
+		let left <- api.GET("/stock/:sku", "MUG-001") by Visitor
+		expect left is Ok(5)
+	}
+
+	case "a job with an impossible quantity is dropped" {
+		let _ <- api.POST("/stock/:sku", "MUG-001", 5) by Visitor
+		let r <- packer.message(PackJob { sku: "MUG-001", quantity: 500 })
+		expect r is Ack
+		let left <- api.GET("/stock/:sku", "MUG-001") by Visitor
+		expect left is Ok(5)
+	}
+
+	case "an order is accepted over the wire" {
+		let r <- api.POST("/orders", Order { sku: "MUG-001", quantity: 2 }) by Visitor
+		expect r is Accepted("queued")
+	}
+
+	case "an order the boundary refuses is never queued" {
+		let r <- api.POST("/orders", Wire("{\"sku\": \"MUG-001\", \"quantity\": 0}")) by Visitor
+		expect r is Rejected(RefinementViolation(_))
+	}
+}

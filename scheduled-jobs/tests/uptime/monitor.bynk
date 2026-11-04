@@ -1,0 +1,60 @@
+suite uptime.monitor
+
+// `Fetch` faults under test unless stubbed, so a case that fires the probe
+// says what the upstream answers. The test clock reads the epoch, so a target
+// added over HTTP starts with `seenUp` at midnight on day 0. Each `at` is a
+// time its schedule really fires: 00:05 is 300000, 03:05 is 11100000, and 03:00
+// on day 1 is 97200000.
+
+case "a healthy answer is recorded and moves seenUp to the scheduled time" {
+	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "" })
+	let _ <- api.POST("/targets", NewTarget { name: "shop", url: "https://shop.test" }) by Visitor
+	let r <- jobs.schedule("*/5 * * * *", 300000)
+	expect r is Ok(_)
+	expect Fetch.send called once with req.url == "https://shop.test"
+	let t <- api.GET("/targets/:name", "shop") by Visitor
+	match t {
+		Ok(target) => {
+			expect target.last == Answered(200)
+			expect target.seenUp == Instant.fromEpochMillis(300000)
+		},
+		_ => expect false,
+	}
+}
+
+case "an upstream that is down is recorded, and the run still succeeds" {
+	stub Fetch.send(_) returns Err(Network)
+	let _ <- api.POST("/targets", NewTarget { name: "shop", url: "https://shop.test" }) by Visitor
+	let r <- jobs.schedule("*/5 * * * *", 300000)
+	expect r is Ok(_)
+	let t <- api.GET("/targets/:name", "shop") by Visitor
+	expect t is Ok(Target { last: Unreachable, .. })
+}
+
+case "with nothing to watch the probe sends nothing" {
+	let r <- jobs.schedule("*/5 * * * *", 300000)
+	expect r is Ok(_)
+	expect Fetch.send never called
+}
+
+case "a healthy probe keeps a target past the nightly sweep" {
+	stub Fetch.send(_) returns Ok(Response { status: 204, headers: Map.empty(), body: "" })
+	let _ <- api.POST("/targets", NewTarget { name: "shop", url: "https://shop.test" }) by Visitor
+	let _ <- jobs.schedule("*/5 * * * *", 11100000)
+	let r <- jobs.schedule("0 3 * * *", 97200000)
+	expect r is Ok(_)
+	expect Logger.info never called
+	let t <- api.GET("/targets/:name", "shop") by Visitor
+	expect t is Ok(_)
+}
+
+case "a 5xx is no sign of life, so the sweep retires the target" {
+	stub Fetch.send(_) returns Ok(Response { status: 503, headers: Map.empty(), body: "" })
+	let _ <- api.POST("/targets", NewTarget { name: "shop", url: "https://shop.test" }) by Visitor
+	let _ <- jobs.schedule("*/5 * * * *", 11100000)
+	let r <- jobs.schedule("0 3 * * *", 97200000)
+	expect r is Ok(_)
+	expect Logger.info called once with msg == "stopped watching shop"
+	let t <- api.GET("/targets/:name", "shop") by Visitor
+	expect t is NotFound
+}

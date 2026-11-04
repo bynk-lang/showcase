@@ -1,0 +1,7 @@
+[project]
+name = "queues"
+version = "0.1.0"
+
+# `bynk.cloudflare.Queue`, the producer side, is still experimental.
+[unstable]
+allow = ["bynk.cloudflare.Queue"]

@@ -1,0 +1,51 @@
+---
+The checkout. It takes orders and announces each one as an `OrderPlaced`
+event.
+
+It names no subscriber. Loyalty points and the sales tally live in their own
+contexts and listen for the event, so adding a third listener never touches
+this file.
+---
+context shop.orders
+
+consumes bynk { Events }
+exports transparent { OrderPlaced, Region }
+
+--- Where an order ships. The loyalty scheme only runs at home.
+type Region = enum { Domestic, International }
+
+---
+A fact: an order was placed. An event is a plain record shape, declared in the
+one context allowed to emit it.
+---
+event OrderPlaced = {
+	orderId: String,
+	customer: String,
+	region: Region,
+	totalPence: Int,
+}
+
+service checkout {
+	---
+	Place an order and announce it. A refused order returns `Err` before the
+	emit, so nobody hears about an order that never happened.
+	---
+	on call(
+		orderId: String,
+		customer: String,
+		region: Region,
+		totalPence: Int
+	) -> Effect[Result[(), String]] given Events {
+		if totalPence <= 0 {
+			Err("an order must cost something")
+		} else {
+			let _ <- Events.emit[OrderPlaced](OrderPlaced {
+				orderId: orderId,
+				customer: customer,
+				region: region,
+				totalPence: totalPence,
+			})
+			Ok(())
+		}
+	}
+}

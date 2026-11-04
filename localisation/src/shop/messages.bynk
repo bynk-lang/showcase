@@ -1,0 +1,40 @@
+commons shop.messages
+
+uses bynk.locale
+uses bynk.locale.types
+
+---
+The reference locale. Every other block must declare the same codes with the
+same placeholders, and `render` falls back to this block for a tag the
+bundle doesn't declare.
+---
+messages "en" @reference {
+	"basket.summary" => "{n, plural, one {# item} other {# items}} in your basket"
+}
+
+---
+French counts 0 as `one`, so an empty basket reads "0 article". The template
+only names the arms; the host's plural rules pick which one applies.
+---
+messages "fr" {
+	"basket.summary" => "{n, plural, one {# article} other {# articles}} dans votre panier"
+}
+
+---
+Polish needs `few` for 2–4 and 22–24 (but not 12–14), and `many` for most
+other counts, such as 5 or 12. Each locale declares the arms its own grammar
+uses.
+---
+messages "pl" {
+	"basket.summary" => "{n, plural, one {# produkt} few {# produkty} many {# produktów} other {# produktów}} w koszyku"
+}
+
+---
+The basket summary in `tag`'s language. It lives here, beside the bundle,
+because both `bynk.locale` and this bundle export a `render`. A context that
+calls this function never has to `uses bynk.locale`, so it never meets the
+clash.
+---
+fn basketSummary(tag: LocaleTag, count: Int) -> String {
+	render(tag, withWhole(message("basket.summary"), "n", count))
+}

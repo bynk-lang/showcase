@@ -1,0 +1,31 @@
+suite shop.messages
+
+// `render` takes the tag as an argument, so the bundle is tested with plain
+// literals. No capability is involved.
+
+case "English plurals: 0 and 7 are `other`, 1 is `one`" {
+	expect basketSummary("en", 0) == "0 items in your basket"
+	expect basketSummary("en", 1) == "1 item in your basket"
+	expect basketSummary("en", 7) == "7 items in your basket"
+}
+
+case "French puts 0 in `one`, unlike English" {
+	expect basketSummary("fr", 0) == "0 article dans votre panier"
+	expect basketSummary("fr", 1) == "1 article dans votre panier"
+	expect basketSummary("fr", 7) == "7 articles dans votre panier"
+}
+
+case "Polish picks `few` for 2 and 22, and `many` for 5" {
+	expect basketSummary("pl", 1) == "1 produkt w koszyku"
+	expect basketSummary("pl", 2) == "2 produkty w koszyku"
+	expect basketSummary("pl", 22) == "22 produkty w koszyku"
+	expect basketSummary("pl", 5) == "5 produktów w koszyku"
+}
+
+case "an undeclared language falls back to the reference locale" {
+	expect basketSummary("de", 2) == "2 items in your basket"
+}
+
+case "render matches tags exactly, so a regional tag falls back too" {
+	expect basketSummary("fr-CA", 2) == "2 items in your basket"
+}

@@ -1,0 +1,17 @@
+commons uptime.policy
+
+---
+How long a target may go without a healthy answer before the nightly sweep
+stops watching it.
+---
+const GiveUpAfter: Duration = 1.days
+
+--- A target is healthy when it answers with a 2xx or 3xx status.
+fn isHealthy(status: Int) -> Bool {
+	status >= 200 && status < 400
+}
+
+--- Whether a target last heard from at `seenUp` has been quiet too long by `now`.
+fn isAbandoned(seenUp: Instant, now: Instant) -> Bool {
+	now - seenUp >= GiveUpAfter
+}

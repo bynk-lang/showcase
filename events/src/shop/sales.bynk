@@ -1,0 +1,35 @@
+---
+The sales tally: a second, independent listener for the same event.
+
+With no pattern, it hears every order, whatever its region.
+---
+context shop.sales
+
+consumes shop.orders
+
+--- Running totals across every order.
+agent Takings {
+	key id: String
+
+	store orders: Cell[Int] = 0
+	store pence: Cell[Int] = 0
+
+	on call add(totalPence: Int) -> Effect[()] {
+		let _ <- orders.update((n) => n + 1)
+		let _ <- pence.update((n) => n + totalPence)
+	}
+
+	on call count() -> Effect[Int] {
+		orders
+	}
+
+	on call sum() -> Effect[Int] {
+		pence
+	}
+}
+
+service TallySale from Events(OrderPlaced) {
+	on event(e: OrderPlaced) -> Effect[()] {
+		Takings("all").add(e.totalPence)
+	}
+}

@@ -1,0 +1,90 @@
+context payments.hooks
+
+consumes bynk { Secrets }
+consumes bynk.crypto { Crypto }
+
+---
+A payment notice, as the processor sends it. The body is parsed only after its
+signature has been checked, and from the same bytes that were signed.
+---
+type Payment = {
+	id: String,
+	amountPence: Int,
+}
+
+---
+The payment processor. It proves who it is with an HMAC-SHA256 of the raw body,
+keyed with the shared secret `WEBHOOK_SECRET`, sent in `X-Signature`.
+
+Declaring that here makes the compiler emit the check at the boundary: it
+recomputes the HMAC over the exact bytes received, compares in constant time, and
+answers `401` before the handler runs. There is no hand-written HMAC to get wrong.
+The signed timestamp limits a replayed request to a five-minute window.
+
+A `Signature` actor attests where a request came from, not who is calling, so it
+has no identity and the handler binds none (`by Processor`).
+---
+actor Processor {
+	auth = Signature(
+		secret = "WEBHOOK_SECRET",
+		header = "X-Signature",
+		timestamp = "X-Timestamp",
+		tolerance = 300
+	)
+}
+
+---
+A receipt for `paymentId`: the hex HMAC-SHA256 of the id under our own key,
+`RECEIPT_KEY`, or `None` when that secret isn't set.
+
+This is signing your own data, so the runtime can't do it for you: we call
+`Crypto` ourselves.
+---
+fn receiptFor(paymentId: String) -> Effect[Option[String]] given Crypto, Secrets {
+	let key <- Secrets.get("RECEIPT_KEY")
+	match key {
+		None => Effect.pure(None),
+		Some(k) => {
+			let mac <- Crypto.hmac(Sha256, Bytes.fromUtf8(k), Bytes.fromUtf8(paymentId))
+			Effect.pure(Some(mac.toHex()))
+		},
+	}
+}
+
+service webhooks from http {
+	---
+	Accept a verified payment notice and answer with a receipt for it. By the time
+	this body runs, the signature has already been checked.
+	---
+	on POST("/webhooks/payment") (
+		body: Payment
+	) -> Effect[HttpResult[String]] by Processor given Crypto, Secrets {
+		let receipt <- receiptFor(body.id)
+		match receipt {
+			None => ServiceUnavailable("receipts are not configured"),
+			Some(r) => Ok(r),
+		}
+	}
+}
+
+service verifyReceipt {
+	---
+	Whether `receipt` is the one we issued for `paymentId`. `verifyHmac` compares
+	in constant time, so how long it takes doesn't reveal how much of it matched.
+	---
+	on call(paymentId: String, receipt: String) -> Effect[Bool] given Crypto, Secrets {
+		let key <- Secrets.get("RECEIPT_KEY")
+		match key {
+			None => Effect.pure(false),
+			Some(k) => match Bytes.fromHex(receipt) {
+				None => Effect.pure(false),
+				Some(mac) => Crypto.verifyHmac(
+					Sha256,
+					Bytes.fromUtf8(k),
+					Bytes.fromUtf8(paymentId),
+					mac
+				),
+			},
+		}
+	}
+}

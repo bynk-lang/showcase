@@ -1,0 +1,36 @@
+---
+The desk, across the real JSON boundary. A `Wire(...)` body is raw text, as a
+client would send it, so a body that leaves the options out can be tested.
+---
+suite postage.desk as system {
+	case "a body without options gets a plain quote" {
+		let r <- api.POST("/quotes", Wire("{\"weight\": 750}")) by Visitor
+		expect r is Handled(Ok(QuoteView { pence: 395, summary: "small parcel, up to 1 kg, standard", .. }))
+	}
+
+	case "a body may set just the options it needs" {
+		let r <- api.POST(
+			"/quotes",
+			Wire("{\"weight\": 4200, \"options\": {\"speed\": {\"kind\": \"Express\"}}}")
+		) by Visitor
+		expect r is Handled(Ok(QuoteView { pence: 995, summary: "medium parcel, up to 5 kg, express", .. }))
+	}
+
+	case "a body may set every option" {
+		let r <- api.POST(
+			"/quotes",
+			Wire("{\"weight\": 20000, \"options\": {\"speed\": {\"kind\": \"Express\"}, \"signed\": true}}")
+		) by Visitor
+		expect r is Handled(Ok(QuoteView { pence: 1770, summary: "large parcel, up to 20 kg, express", .. }))
+	}
+
+	case "a typed request may leave the options out" {
+		let r <- api.POST("/quotes", QuoteRequest { weight: 5001 }) by Visitor
+		expect r is Ok(QuoteView { pence: 1295, .. })
+	}
+
+	case "an overweight parcel is refused before the handler runs" {
+		let r <- api.POST("/quotes", Wire("{\"weight\": 25000}")) by Visitor
+		expect r is Rejected(RefinementViolation(_))
+	}
+}

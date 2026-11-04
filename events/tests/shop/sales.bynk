@@ -1,0 +1,21 @@
+--- The second listener hears what the loyalty scheme ignores.
+suite shop.sales
+
+case "every order is tallied, whatever its region" {
+	let _ <- TallySale.event(OrderPlaced {
+		orderId: "o-1",
+		customer: "ada",
+		region: Region.Domestic,
+		totalPence: 2500,
+	})
+	let _ <- TallySale.event(OrderPlaced {
+		orderId: "o-2",
+		customer: "grace",
+		region: Region.International,
+		totalPence: 4000,
+	})
+	let count <- Takings("all").count()
+	let sum <- Takings("all").sum()
+	expect count == 2
+	expect sum == 6500
+}

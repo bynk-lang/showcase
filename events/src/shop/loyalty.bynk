@@ -1,0 +1,50 @@
+---
+Loyalty points: one point per whole pound spent on a domestic order.
+
+This context consumes `shop.orders` only to name its event. It never calls the
+checkout, and the checkout doesn't know it exists.
+---
+context shop.loyalty
+
+consumes shop.orders
+consumes bynk { Idempotency }
+
+--- How many pence earn one point.
+const PencePerPoint: Int = 100
+
+--- Each customer's points balance.
+agent Points {
+	key customer: String
+
+	store balance: Cell[Int] = 0
+
+	on call award(points: Int) -> Effect[()] {
+		let _ <- balance.update((n) => n + points)
+	}
+
+	on call current() -> Effect[Int] {
+		balance
+	}
+}
+
+---
+Award points for an order. The pattern on the header filters delivery: an
+international order still reaches this service, but its generated handler
+drops it before this body runs.
+
+Delivery is at least once, so the same emission can arrive twice. The handler
+dedups on the envelope's `eventId`, which is minted once per emission, so a
+redelivered order earns nothing.
+---
+service AwardPoints from Events(OrderPlaced { region: Region.Domestic, .. }) {
+	on event(e: OrderPlaced, env: EventEnvelope) -> Effect[()] given Idempotency {
+		let seen <- Idempotency.dedup[()](env.eventId)
+		match seen {
+			Some(_) => (),
+			None => {
+				let _ <- Idempotency.remember[()](env.eventId, (), 7.days)
+				Points(e.customer).award(e.totalPence / PencePerPoint)
+			},
+		}
+	}
+}

@@ -1,0 +1,106 @@
+---
+Postage prices for parcels.
+
+The public surface is `quote`, `quoteWith`, `describe` and the types they
+mention. How a price is built, the weight bands and the fees, is `private`:
+it can change without breaking any unit that `uses` this one.
+
+```bynk test
+expect quote(750) == 395
+expect quoteWith(750, QuoteOptions { signed: true }) == 570
+```
+---
+commons postage.rates
+
+--- A parcel's weight, in grams. The heaviest parcel accepted is 20 kg.
+type Grams = Int where InRange(1, 20000)
+
+--- How fast a parcel travels.
+type Speed = enum {
+	--- The default service.
+	Standard,
+	--- A faster service, at a fixed surcharge.
+	Express,
+}
+
+---
+The settings `quoteWith` takes. Every field has a default, and the defaults
+reproduce `quote`, so a caller names only what it changes. A later option is
+one more defaulted field, and every existing `QuoteOptions { … }` still
+compiles.
+---
+type QuoteOptions = {
+	--- Which service carries the parcel.
+	speed: Speed = Speed.Standard,
+	--- Ask for a signature on delivery.
+	signed: Bool = false,
+}
+
+--- The price, in pence, of sending a parcel of `weight` with no extras.
+fn quote(weight: Grams) -> Int {
+	quoteWith(weight, QuoteOptions {})
+}
+
+--- The price, in pence, of sending a parcel of `weight` with `options`.
+fn quoteWith(weight: Grams, options: QuoteOptions) -> Int {
+	bandFor(weight).pence + surcharge(options)
+}
+
+--- A short description of the band a parcel of `weight` falls in.
+fn describe(weight: Grams) -> String {
+	label(bandFor(weight))
+}
+
+// Everything below is private: visible in this unit and its own suite,
+// never through `uses`.
+
+private const ExpressSurcharge: Int = 300
+
+private const SignatureFee: Int = 175
+
+---
+A weight band. Private, so no public signature may mention it
+(`bynk.visibility.private_in_public`); `describe` hands out a `String`.
+---
+private type Band = {
+	name: String,
+	upToKg: Int,
+	pence: Int,
+}
+
+private fn bandFor(weight: Grams) -> Band {
+	if weight <= 1000 {
+		Band {
+			name: "small",
+			upToKg: 1,
+			pence: 395,
+		}
+	} else {
+		if weight <= 5000 {
+			Band {
+				name: "medium",
+				upToKg: 5,
+				pence: 695,
+			}
+		} else {
+			Band {
+				name: "large",
+				upToKg: 20,
+				pence: 1295,
+			}
+		}
+	}
+}
+
+private fn surcharge(options: QuoteOptions) -> Int {
+	let speed = match options.speed {
+		Standard => 0,
+		Express => ExpressSurcharge,
+	}
+	let signature = if options.signed { SignatureFee } else { 0 }
+	speed + signature
+}
+
+private fn label(band: Band) -> String {
+	"\(band.name) parcel, up to \(band.upToKg) kg"
+}
