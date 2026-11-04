@@ -19,3 +19,18 @@ case "every order is tallied, whatever its region" {
 	expect count == 2
 	expect sum == 6500
 }
+
+case "a redelivered order is counted once" {
+	let sale = OrderPlaced {
+		orderId: "o-1",
+		customer: "ada",
+		region: Region.Domestic,
+		totalPence: 2500,
+	}
+	let _ <- TallySale.event(sale)
+	let _ <- TallySale.event(sale)
+	let count <- Takings("all").count()
+	let sum <- Takings("all").sum()
+	expect count == 1
+	expect sum == 2500
+}

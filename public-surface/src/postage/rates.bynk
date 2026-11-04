@@ -61,34 +61,39 @@ private const SignatureFee: Int = 175
 ---
 A weight band. Private, so no public signature may mention it
 (`bynk.visibility.private_in_public`); `describe` hands out a `String`.
+
+Each band holds its own upper weight, and both `bandFor`'s comparison and the
+label read it from there, so moving a limit moves both.
 ---
 private type Band = {
 	name: String,
-	upToKg: Int,
+	upToGrams: Int,
 	pence: Int,
 }
 
+private const Small: Band = Band {
+	name: "small",
+	upToGrams: 1000,
+	pence: 395,
+}
+
+private const Medium: Band = Band {
+	name: "medium",
+	upToGrams: 5000,
+	pence: 695,
+}
+
+private const Large: Band = Band {
+	name: "large",
+	upToGrams: 20000,
+	pence: 1295,
+}
+
 private fn bandFor(weight: Grams) -> Band {
-	if weight <= 1000 {
-		Band {
-			name: "small",
-			upToKg: 1,
-			pence: 395,
-		}
+	if weight <= Small.upToGrams {
+		Small
 	} else {
-		if weight <= 5000 {
-			Band {
-				name: "medium",
-				upToKg: 5,
-				pence: 695,
-			}
-		} else {
-			Band {
-				name: "large",
-				upToKg: 20,
-				pence: 1295,
-			}
-		}
+		if weight <= Medium.upToGrams { Medium } else { Large }
 	}
 }
 
@@ -102,5 +107,5 @@ private fn surcharge(options: QuoteOptions) -> Int {
 }
 
 private fn label(band: Band) -> String {
-	"\(band.name) parcel, up to \(band.upToKg) kg"
+	"\(band.name) parcel, up to \(band.upToGrams / 1000) kg"
 }

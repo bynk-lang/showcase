@@ -1,11 +1,20 @@
 context uptime.monitor
 
 uses uptime.policy
-consumes bynk { Clock, Fetch, Logger }
+consumes bynk { Clock, Fetch, Logger, TimedOut }
 
 type Name = String where NonEmpty && MaxLength(40)
 
+--- Only `http` and `https` URLs. `Matches` is anchored, so the whole string must fit.
 type Url = String where Matches("https?://.+")
+
+type OperatorId = String where NonEmpty
+
+---
+Whoever runs the monitor: a JWT verified at the boundary. A missing, forged or
+expired token is a `401` before any handler runs.
+---
+actor Operator { auth = Bearer(secret = "OPS_JWT_SECRET"), identity = OperatorId }
 
 --- What the last probe of a target found.
 type Probe =
@@ -33,13 +42,30 @@ than anything a caller chooses.
 ---
 const Everything: String = "all"
 
+---
+How long one probe may wait for an answer. A target that hangs is recorded as
+`Unreachable` instead of holding up the run.
+---
+const ProbeBudget: Duration = 10.seconds
+
 agent Watchlist {
 	key id: String
 
 	store targets: Map[Name, Target]
 
-	on call add(t: Target) -> Effect[()] {
-		do targets.put(t.name, t)
+	---
+	Start watching `t`, unless its name is taken. Refusing a duplicate means no
+	one can swap another target's URL or reset its `seenUp` by adding it again.
+	---
+	on call add(t: Target) -> Effect[Bool] {
+		let found <- targets.get(t.name)
+		match found {
+			Some(_) => false,
+			None => {
+				do targets.put(t.name, t)
+				true
+			},
+		}
 	}
 
 	on call find(name: Name) -> Effect[Option[Target]] {
@@ -84,14 +110,16 @@ an `Instant` straight away.
 ---
 service jobs from cron {
 	---
-	Every five minutes, probe each target. An upstream that is down is a result
-	to record, not a failed run, so a `FetchError` becomes `Unreachable` and the
+	Every five minutes, probe each target. The probes don't depend on each other,
+	so `parTraverse` sends them together: the run costs the slowest probe, not the
+	sum, and each is bounded by `ProbeBudget`. An upstream that is down or too slow
+	is a result to record, not a failed run, so it becomes `Unreachable` and the
 	run still returns `Ok`.
 	---
 	on schedule("*/5 * * * *") (at: Int) -> Effect[Result[(), String]] given Fetch {
 		let now = Instant.fromEpochMillis(at)
 		let targets <- Watchlist(Everything).all()
-		do targets.forEach((t) => {
+		do targets.parTraverse((t) => {
 			let res <- Fetch.send(Request {
 				method: Get,
 				url: t.url,
@@ -99,10 +127,12 @@ service jobs from cron {
 				authorization: None,
 				headers: Map.empty(),
 				body: None,
-			})
+			}).within(ProbeBudget)
+			// A timeout stops the wait, not the request: the abandoned call runs on.
 			let probe = match res {
-				Ok(r) => Answered(r.status),
-				Err(_) => Unreachable,
+				Ok(Ok(r)) => Answered(r.status),
+				Ok(Err(_)) => Unreachable,
+				Err(TimedOut { .. }) => Unreachable,
 			}
 			do Watchlist(Everything).observe(t.name, probe, now)
 		})
@@ -128,7 +158,13 @@ Add a target and read it back. The HTTP side is small, but it is how anyone
 sees what the jobs did, and it lets a `system` suite drive the real Worker.
 ---
 service api from http {
-	on POST("/targets") (body: NewTarget) -> Effect[HttpResult[Target]] by Visitor given Clock {
+	---
+	Only an operator may add a target. The cron fetches every URL it is given, so
+	an open route would let anyone point it at internal hosts. The guard limits
+	who chooses the URLs; it doesn't check where they point. A name that is
+	already watched is a `409`, never a replacement.
+	---
+	on POST("/targets") (body: NewTarget) -> Effect[HttpResult[Target]] by Operator given Clock {
 		let now <- Clock.now()
 		let t = Target {
 			name: body.name,
@@ -136,8 +172,8 @@ service api from http {
 			last: Unchecked,
 			seenUp: now,
 		}
-		do Watchlist(Everything).add(t)
-		Created(t)
+		let added <- Watchlist(Everything).add(t)
+		if added { Created(t) } else { Conflict("\(body.name) is already watched") }
 	}
 
 	on GET("/targets/:name") (name: Name) -> Effect[HttpResult[Target]] by Visitor {
