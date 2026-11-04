@@ -13,4 +13,15 @@ suite warehouse.packing {
 		expect r is Ack
 		expect Logger.warn called once
 	}
+
+	case "a SKU must match the whole pattern, not just contain it" {
+		// `Matches` is anchored at both ends, so a valid SKU with anything
+		// before or after it is still refused.
+		expect Sku.of("MUG-001") is Ok(_)
+		expect Sku.of("xMUG-001") is Err(_)
+		expect Sku.of("MUG-0012") is Err(_)
+		let r <- packer.message(PackJob { sku: "xMUG-001", quantity: 2 })
+		expect r is Ack
+		expect Logger.warn called once
+	}
 }

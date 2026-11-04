@@ -6,6 +6,7 @@ With no pattern, it hears every order, whatever its region.
 context shop.sales
 
 consumes shop.orders
+consumes bynk { Clock }
 
 --- Running totals across every order.
 agent Takings {
@@ -13,10 +14,23 @@ agent Takings {
 
 	store orders: Cell[Int] = 0
 	store pence: Cell[Int] = 0
+	---
+	The orders already counted. Delivery is at least once, so like the
+	loyalty scheme the tally dedups on `orderId`, in the same handler that
+	adds to the totals, so a redelivery is never counted twice.
+	---
+	store counted: Cache[String, ()] @ttl(7.days)
 
-	on call add(totalPence: Int) -> Effect[()] {
-		let _ <- orders.update((n) => n + 1)
-		let _ <- pence.update((n) => n + totalPence)
+	on call add(orderId: String, totalPence: Int) -> Effect[()] given Clock {
+		let seen <- counted.get(orderId)
+		match seen {
+			Some(_) => (),
+			None => {
+				do counted.put(orderId, ())
+				let _ <- orders.update((n) => n + 1)
+				let _ <- pence.update((n) => n + totalPence)
+			},
+		}
 	}
 
 	on call count() -> Effect[Int] {
@@ -30,6 +44,6 @@ agent Takings {
 
 service TallySale from Events(OrderPlaced) {
 	on event(e: OrderPlaced) -> Effect[()] {
-		Takings("all").add(e.totalPence)
+		Takings("all").add(e.orderId, e.totalPence)
 	}
 }

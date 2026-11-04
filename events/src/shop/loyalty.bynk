@@ -7,7 +7,7 @@ checkout, and the checkout doesn't know it exists.
 context shop.loyalty
 
 consumes shop.orders
-consumes bynk { Idempotency }
+consumes bynk { Clock }
 
 --- How many pence earn one point.
 const PencePerPoint: Int = 100
@@ -17,9 +17,32 @@ agent Points {
 	key customer: String
 
 	store balance: Cell[Int] = 0
+	---
+	The orders already awarded: a set of ids, so only presence matters. A
+	week outlasts any redelivery, so an entry can expire once nothing will
+	repeat it.
+	---
+	store awarded: Cache[String, ()] @ttl(7.days)
 
-	on call award(points: Int) -> Effect[()] {
-		let _ <- balance.update((n) => n + points)
+	---
+	Award an order's points at most once.
+
+	The check and the award are one handler, and an agent commits a handler's
+	writes together when it returns, or not at all if it faults. So there is
+	no window where the order is marked but the points are missing, or the
+	points are in but the order isn't marked. Keeping the mark beside the
+	balance is what buys that: a separate dedup store would be a second write
+	that can succeed or fail on its own.
+	---
+	on call award(orderId: String, points: Int) -> Effect[()] given Clock {
+		let seen <- awarded.get(orderId)
+		match seen {
+			Some(_) => (),
+			None => {
+				do awarded.put(orderId, ())
+				let _ <- balance.update((n) => n + points)
+			},
+		}
 	}
 
 	on call current() -> Effect[Int] {
@@ -32,19 +55,13 @@ Award points for an order. The pattern on the header filters delivery: an
 international order still reaches this service, but its generated handler
 drops it before this body runs.
 
-Delivery is at least once, so the same emission can arrive twice. The handler
-dedups on the envelope's `eventId`, which is minted once per emission, so a
-redelivered order earns nothing.
+Delivery is at least once, so the same order can arrive twice: as a
+redelivered emission, or as a second emission when a customer resubmits a
+checkout that timed out. Both carry the same `orderId`, so `award` dedups on
+that rather than on the envelope's `eventId`, which only catches the first.
 ---
 service AwardPoints from Events(OrderPlaced { region: Region.Domestic, .. }) {
-	on event(e: OrderPlaced, env: EventEnvelope) -> Effect[()] given Idempotency {
-		let seen <- Idempotency.dedup[()](env.eventId)
-		match seen {
-			Some(_) => (),
-			None => {
-				let _ <- Idempotency.remember[()](env.eventId, (), 7.days)
-				Points(e.customer).award(e.totalPence / PencePerPoint)
-			},
-		}
+	on event(e: OrderPlaced) -> Effect[()] {
+		Points(e.customer).award(e.orderId, e.totalPence / PencePerPoint)
 	}
 }

@@ -5,10 +5,10 @@ pattern filter applies. No checkout is involved.
 ---
 suite shop.loyalty
 
---- An order where only the region matters to the case.
-fn order(region: Region) -> OrderPlaced {
+--- A £25.99 order from ada, numbered `id`.
+fn order(id: String, region: Region) -> OrderPlaced {
 	OrderPlaced {
-		orderId: "o-1",
+		orderId: id,
 		customer: "ada",
 		region: region,
 		totalPence: 2599,
@@ -16,36 +16,30 @@ fn order(region: Region) -> OrderPlaced {
 }
 
 case "a domestic order earns a point per whole pound" {
-	let _ <- AwardPoints.event(order(Region.Domestic))
+	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
 	let points <- Points("ada").current()
 	expect points == 25
 }
 
 case "an international order is filtered out before the handler runs" {
-	let _ <- AwardPoints.event(order(Region.International))
+	let _ <- AwardPoints.event(order("o-1", Region.International))
 	let points <- Points("ada").current()
 	expect points == 0
-	expect Idempotency.dedup called 0 times
 }
 
-case "a redelivered emission earns nothing the second time" {
-	let env = EventEnvelope {
-		eventId: "evt-1",
-		publisherId: "shop.orders",
-		emittedAt: Instant.fromEpochMillis(0),
-		schemaVersion: 1,
-	}
-	let _ <- AwardPoints.event(order(Region.Domestic), env)
-	let _ <- AwardPoints.event(order(Region.Domestic), env)
+case "the same order earns nothing the second time" {
+	// Each delivery here gets a fresh `eventId`, as a resubmitted checkout's
+	// second emission would. A redelivery repeats the `eventId` too, but the
+	// handler never reads it: the `orderId` is the same, so it is one award.
+	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
+	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
 	let points <- Points("ada").current()
 	expect points == 25
-	expect Idempotency.remember called once
 }
 
-case "two emissions of the same order are two awards" {
-	// With no envelope, each delivery gets a fresh `eventId`.
-	let _ <- AwardPoints.event(order(Region.Domestic))
-	let _ <- AwardPoints.event(order(Region.Domestic))
+case "two different orders are two awards" {
+	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
+	let _ <- AwardPoints.event(order("o-2", Region.Domestic))
 	let points <- Points("ada").current()
 	expect points == 50
 }

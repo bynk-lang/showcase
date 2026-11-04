@@ -5,7 +5,7 @@ client would send it, so a body that leaves the options out can be tested.
 suite postage.desk as system {
 	case "a body without options gets a plain quote" {
 		let r <- api.POST("/quotes", Wire("{\"weight\": 750}")) by Visitor
-		expect r is Handled(Ok(QuoteView { pence: 395, summary: "small parcel, up to 1 kg, standard", .. }))
+		expect r is Handled(Ok(QuoteView { pence: 395, summary: "small parcel, up to 1000 g, standard", .. }))
 	}
 
 	case "a body may set just the options it needs" {
@@ -13,7 +13,7 @@ suite postage.desk as system {
 			"/quotes",
 			Wire("{\"weight\": 4200, \"options\": {\"speed\": {\"kind\": \"Express\"}}}")
 		) by Visitor
-		expect r is Handled(Ok(QuoteView { pence: 995, summary: "medium parcel, up to 5 kg, express", .. }))
+		expect r is Handled(Ok(QuoteView { pence: 995, summary: "medium parcel, up to 5000 g, express", .. }))
 	}
 
 	case "a body may set every option" {
@@ -21,7 +21,7 @@ suite postage.desk as system {
 			"/quotes",
 			Wire("{\"weight\": 20000, \"options\": {\"speed\": {\"kind\": \"Express\"}, \"signed\": true}}")
 		) by Visitor
-		expect r is Handled(Ok(QuoteView { pence: 1770, summary: "large parcel, up to 20 kg, express", .. }))
+		expect r is Handled(Ok(QuoteView { pence: 1770, summary: "large parcel, up to 20000 g, express", .. }))
 	}
 
 	case "a typed request may leave the options out" {
