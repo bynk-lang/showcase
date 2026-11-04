@@ -12,7 +12,12 @@ expect quoteWith(750, QuoteOptions { signed: true }) == 570
 ---
 commons postage.rates
 
---- A parcel's weight, in grams. The heaviest parcel accepted is 20 kg.
+---
+A parcel's weight, in grams. The heaviest parcel accepted is 20 kg.
+
+The upper bound must equal `Large.upToGrams`: a refinement bound has to be a
+literal, so it can't name the constant, and the two move together.
+---
 type Grams = Int where InRange(1, 20000)
 
 --- How fast a parcel travels.
@@ -63,7 +68,8 @@ A weight band. Private, so no public signature may mention it
 (`bynk.visibility.private_in_public`); `describe` hands out a `String`.
 
 Each band holds its own upper weight, and both `bandFor`'s comparison and the
-label read it from there, so moving a limit moves both.
+label read it from there, so moving a limit moves both. The label prints grams,
+so any limit reads correctly, not only a whole number of kilograms.
 ---
 private type Band = {
 	name: String,
@@ -83,6 +89,7 @@ private const Medium: Band = Band {
 	pence: 695,
 }
 
+--- The last band takes every weight `Grams` admits, so its limit is that ceiling.
 private const Large: Band = Band {
 	name: "large",
 	upToGrams: 20000,
@@ -107,5 +114,5 @@ private fn surcharge(options: QuoteOptions) -> Int {
 }
 
 private fn label(band: Band) -> String {
-	"\(band.name) parcel, up to \(band.upToGrams / 1000) kg"
+	"\(band.name) parcel, up to \(band.upToGrams) g"
 }

@@ -29,7 +29,7 @@ suite postage.rates {
 	}
 
 	case "describe names the band" {
-		expect describe(3000) == "medium parcel, up to 5 kg"
+		expect describe(3000) == "medium parcel, up to 5000 g"
 	}
 
 	case "a weight outside the range is refused" {

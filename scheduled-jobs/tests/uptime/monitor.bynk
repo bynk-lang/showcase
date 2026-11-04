@@ -86,6 +86,23 @@ case "a name already watched is a conflict, and the first target stands" {
 	expect t is Ok(Target { url: "https://shop.test", .. })
 }
 
+case "a wrong URL is fixed by removing the target and adding it again" {
+	let _ <- api.POST("/targets", NewTarget {
+		name: "shop",
+		url: "https://wrong.test",
+	}) by Operator("ops")
+	let gone <- api.DELETE("/targets/:name", "shop") by Operator("ops")
+	expect gone is NoContent
+	let _ <- api.POST("/targets", NewTarget {
+		name: "shop",
+		url: "https://shop.test",
+	}) by Operator("ops")
+	let t <- api.GET("/targets/:name", "shop") by Visitor
+	expect t is Ok(Target { url: "https://shop.test", .. })
+	let again <- api.DELETE("/targets/:name", "nowhere") by Operator("ops")
+	expect again is NotFound
+}
+
 case "a target that hangs times out while the others are still probed" {
 	stub Fetch.send(Request { method: Get, url: "https://api.test", contentType: None, authorization: None, headers: Map.empty(), body: None }) never
 	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "" })

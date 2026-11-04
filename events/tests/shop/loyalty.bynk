@@ -27,22 +27,10 @@ case "an international order is filtered out before the handler runs" {
 	expect points == 0
 }
 
-case "a redelivered emission earns nothing the second time" {
-	let env = EventEnvelope {
-		eventId: "evt-1",
-		publisherId: "shop.orders",
-		emittedAt: Instant.fromEpochMillis(0),
-		schemaVersion: 1,
-	}
-	let _ <- AwardPoints.event(order("o-1", Region.Domestic), env)
-	let _ <- AwardPoints.event(order("o-1", Region.Domestic), env)
-	let points <- Points("ada").current()
-	expect points == 25
-}
-
-case "a resubmitted checkout earns nothing the second time" {
-	// With no envelope, each delivery gets a fresh `eventId`, as a second
-	// emission would. The `orderId` is the same, so it is still one award.
+case "the same order earns nothing the second time" {
+	// Each delivery here gets a fresh `eventId`, as a resubmitted checkout's
+	// second emission would. A redelivery repeats the `eventId` too, but the
+	// handler never reads it: the `orderId` is the same, so it is one award.
 	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
 	let _ <- AwardPoints.event(order("o-1", Region.Domestic))
 	let points <- Points("ada").current()

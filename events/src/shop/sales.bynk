@@ -19,14 +19,14 @@ agent Takings {
 	loyalty scheme the tally dedups on `orderId`, in the same handler that
 	adds to the totals, so a redelivery is never counted twice.
 	---
-	store counted: Cache[String, Int] @ttl(7.days)
+	store counted: Cache[String, ()] @ttl(7.days)
 
 	on call add(orderId: String, totalPence: Int) -> Effect[()] given Clock {
 		let seen <- counted.get(orderId)
 		match seen {
 			Some(_) => (),
 			None => {
-				do counted.put(orderId, totalPence)
+				do counted.put(orderId, ())
 				let _ <- orders.update((n) => n + 1)
 				let _ <- pence.update((n) => n + totalPence)
 			},

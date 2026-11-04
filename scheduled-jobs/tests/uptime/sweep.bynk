@@ -33,11 +33,13 @@ suite uptime.monitor as system {
 		expect r is Ok(_)
 	}
 
-	case "adding a target without an operator token is refused" {
+	case "changing the watchlist without an operator token is refused" {
 		let r <- api.POST("/targets", NewTarget {
 			name: "metadata",
 			url: "http://169.254.169.254",
 		}) by Nobody
 		expect r is Rejected(Unauthorized)
+		let d <- api.DELETE("/targets/:name", "shop") by Nobody
+		expect d is Rejected(Unauthorized)
 	}
 }

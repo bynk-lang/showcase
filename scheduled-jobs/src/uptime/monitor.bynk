@@ -68,6 +68,18 @@ agent Watchlist {
 		}
 	}
 
+	--- Stop watching `name`. Says whether it was being watched.
+	on call drop(name: Name) -> Effect[Bool] {
+		let found <- targets.get(name)
+		match found {
+			None => false,
+			Some(_) => {
+				do targets.remove(name)
+				true
+			},
+		}
+	}
+
 	on call find(name: Name) -> Effect[Option[Target]] {
 		targets.get(name)
 	}
@@ -115,6 +127,11 @@ service jobs from cron {
 	sum, and each is bounded by `ProbeBudget`. An upstream that is down or too slow
 	is a result to record, not a failed run, so it becomes `Unreachable` and the
 	run still returns `Ok`.
+
+	Two limits to know before watching hundreds of targets: `parTraverse` starts
+	every probe at once, and Workers cap simultaneous outbound connections; and
+	each probe records its own result, one call into `Watchlist` per target.
+	Batching would mean collecting the results and recording them in one call.
 	---
 	on schedule("*/5 * * * *") (at: Int) -> Effect[Result[(), String]] given Fetch {
 		let now = Instant.fromEpochMillis(at)
@@ -174,6 +191,16 @@ service api from http {
 		}
 		let added <- Watchlist(Everything).add(t)
 		if added { Created(t) } else { Conflict("\(body.name) is already watched") }
+	}
+
+	---
+	Only an operator may stop watching a target. With no replacement on `POST`,
+	this is how a target added with the wrong URL is fixed: remove it, then add
+	it again.
+	---
+	on DELETE("/targets/:name") (name: Name) -> Effect[HttpResult[String]] by Operator {
+		let dropped <- Watchlist(Everything).drop(name)
+		if dropped { NoContent } else { NotFound }
 	}
 
 	on GET("/targets/:name") (name: Name) -> Effect[HttpResult[Target]] by Visitor {

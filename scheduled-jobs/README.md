@@ -61,7 +61,12 @@ on schedule("0 3 * * *") (at: Int) -> Effect[Result[(), String]] given Logger {
 Because the cron fetches whatever URL it is given, `POST /targets` is guarded by
 an `Operator` actor (a verified bearer token), and the agent's `add` refuses a
 name it already watches, so the route answers `Conflict` rather than replacing
-a target or resetting its `seenUp`.
+a target or resetting its `seenUp`. To fix a wrong URL, an operator removes the
+target with `DELETE /targets/:name` and adds it again.
+
+`parTraverse` starts every probe at once, and each records its own result, so
+the doc comment on the probe notes what to change before watching hundreds of
+targets.
 
 [`tests/uptime/monitor.bynk`](tests/uptime/monitor.bynk) is the unit suite. It
 fires each schedule with `jobs.schedule("<expr>", at)`, stubs what the upstream
@@ -88,7 +93,7 @@ as `Answered(200)`.
 [`tests/uptime/sweep.bynk`](tests/uptime/sweep.bynk) runs `as system`, so the
 schedule fires through the Worker's real `scheduled` entry point. A `stub` isn't
 allowed there, so it drives only the sweep, plus one `by Nobody` case showing
-the auth seam refuse an anonymous `POST`. `advance Clock` stamps two targets
+the auth seam refuse an anonymous `POST` and `DELETE`. `advance Clock` stamps two targets
 five minutes apart, and one sweep at 03:00 the next day lands on either side of
 the one-day boundary:
 

@@ -68,13 +68,12 @@ What that buys you:
    `expect Events.emit called once`, and `called 0 times` for a refused order.
 5. [`tests/shop/loyalty.bynk`](tests/shop/loyalty.bynk): the subscriber
    alone. `AwardPoints.event(e)` delivers one event through the same
-   generated handler the fan-out uses, so the pattern filter applies. Passing
-   the same envelope twice checks a redelivery, and the same order with a fresh
-   envelope checks a resubmitted checkout:
+   generated handler the fan-out uses, so the pattern filter applies. Delivering
+   the same order twice earns its points once, whatever the envelope says:
 
    ```bynk
-   let _ <- AwardPoints.event(order("o-1", Region.Domestic), env)
-   let _ <- AwardPoints.event(order("o-1", Region.Domestic), env)
+   let _ <- AwardPoints.event(order("o-1", Region.Domestic))
+   let _ <- AwardPoints.event(order("o-1", Region.Domestic))
    let points <- Points("ada").current()
    expect points == 25
    ```

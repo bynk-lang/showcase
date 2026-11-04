@@ -18,10 +18,11 @@ agent Points {
 
 	store balance: Cell[Int] = 0
 	---
-	The orders already awarded, and the points each earned. A week outlasts
-	any redelivery, so an entry can expire once nothing will repeat it.
+	The orders already awarded: a set of ids, so only presence matters. A
+	week outlasts any redelivery, so an entry can expire once nothing will
+	repeat it.
 	---
-	store awarded: Cache[String, Int] @ttl(7.days)
+	store awarded: Cache[String, ()] @ttl(7.days)
 
 	---
 	Award an order's points at most once.
@@ -38,7 +39,7 @@ agent Points {
 		match seen {
 			Some(_) => (),
 			None => {
-				do awarded.put(orderId, points)
+				do awarded.put(orderId, ())
 				let _ <- balance.update((n) => n + points)
 			},
 		}
