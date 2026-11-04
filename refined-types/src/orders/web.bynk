@@ -1,0 +1,20 @@
+context orders.web
+
+uses orders.stock
+
+---
+A tiny shop front. Every refined value arrives through a typed parameter,
+so the router validates it before a handler runs: a bad `:sku` or body is
+a `400 RefinementViolation`, and the handlers below never re-check.
+---
+service api from http {
+	--- Quote a price for one order line.
+	on POST("/quotes") (body: Line) -> Effect[HttpResult[Int]] by Visitor {
+		Ok(linePrice(body))
+	}
+
+	--- Start a line for `sku` at the first quantity.
+	on POST("/lines/:sku") (sku: Sku) -> Effect[HttpResult[Line]] by Visitor {
+		Created(Line { sku: sku, qty: firstQuantity() })
+	}
+}

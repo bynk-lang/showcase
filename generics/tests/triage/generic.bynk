@@ -1,0 +1,52 @@
+suite triage.generic {
+	case "occurrences compares with ==" {
+		let words = ["a", "b", "a"]
+		expect occurrences(words, "a") == 2
+		expect occurrences(words, "z") == 0
+	}
+
+	case "clamp pins a value outside the range to the nearer end" {
+		expect clamp(5, 1, 10) == 5
+		expect clamp(0, 1, 10) == 1
+		expect clamp(42, 1, 10) == 10
+		expect clamp("zebra", "apple", "mango") == "mango"
+	}
+
+	property "clamp always lands in the range" {
+		for all x: Int, lo: Int, hi: Int where lo <= hi {
+			expect clamp(x, lo, hi) >= lo
+			expect clamp(x, lo, hi) <= hi
+		}
+	}
+
+	case "countBy groups under the key it is given" {
+		let words = ["ant", "bee", "wasp"]
+		let counts = countBy(words, (w) => w.length())
+		expect counts.get(3) == Some(2)
+		expect counts.get(4) == Some(1)
+		expect counts.get(5) is None
+	}
+
+	case "fromList sorts on the way in" {
+		let xs = [3, 1, 2]
+		expect Sorted.fromList(xs).items == [1, 2, 3]
+	}
+
+	case "insert keeps the order" {
+		let fruit = ["kiwi", "apple"]
+		let s = Sorted.fromList(fruit).insert("fig")
+		expect s.items == ["apple", "fig", "kiwi"]
+		expect s.first() == Some("apple")
+	}
+
+	case "an empty Sorted names its type and has no first item" {
+		let s = Sorted.empty[Int]()
+		expect s.first() is None
+		expect s.insert(7).items == [7]
+	}
+
+	case "an expected type stands in for an explicit type argument" {
+		let s: Sorted[String] = Sorted.empty()
+		expect s.items.length() == 0
+	}
+}

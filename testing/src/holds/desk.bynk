@@ -1,0 +1,43 @@
+---
+The box-office desk: an HTTP service that places holds and looks them up.
+
+It reads the time from `Clock` and keeps holds in `Kv`, both platform
+capabilities. Under `bynkc test` each one is a deterministic double, which is
+what lets the suite in `tests/holds/desk.bynk` test expiry without waiting.
+---
+context holds.desk
+
+uses holds.policy
+consumes bynk { Clock }
+consumes bynk.cloudflare { Kv }
+
+service api from http {
+	--- Place a hold, stamped with the current time.
+	on POST("/holds") (body: HoldRequest) -> Effect[HttpResult[Hold]] by Visitor given Clock, Kv {
+		let now <- Clock.now()
+		let hold = Hold {
+			id: body.id,
+			seats: body.seats,
+			placedAt: now,
+		}
+		let _ <- Kv.put(keyOf(body.id), Json.encode(hold))
+		Created(hold)
+	}
+
+	--- Look up a hold: `Gone` once it has lapsed, `NotFound` if it never existed.
+	on GET("/holds/:id") (id: HoldId) -> Effect[HttpResult[Hold]] by Visitor given Clock, Kv {
+		let stored <- Kv.get(keyOf(id))
+		let now <- Clock.now()
+		match stored {
+			None => NotFound,
+			Some(text) => match Json.decode[Hold](text) {
+				Err(_) => ServerError("a stored hold did not decode"),
+				Ok(hold) => if isLive(hold, now) { Ok(hold) } else { Gone },
+			},
+		}
+	}
+}
+
+fn keyOf(id: HoldId) -> String {
+	"hold:\(id)"
+}

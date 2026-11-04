@@ -1,0 +1,58 @@
+---
+Tests for a commons: plain functions over plain values, so nothing needs a
+double. The interesting parts are the fifteen-minute boundary and the edges
+of the refined types.
+---
+suite holds.policy
+
+--- A real request, captured as the box office's front end sends it.
+fixture groupBooking = "fixtures/group-booking.json"
+
+--- The same shape, asking for one seat more than a booking may hold.
+fixture tooManySeats = "fixtures/too-many-seats.json"
+
+---
+A hold placed at the epoch. Its seat count is irrelevant to every case that
+uses it, so `Val[Seats]` fabricates a valid one. A `HoldId` is refined by a
+pattern, which `Val` cannot invent, so it is pinned.
+---
+fn placedAtEpoch() -> Hold {
+	Hold {
+		id: Val[HoldId]("H-0001"),
+		seats: Val[Seats],
+		placedAt: Instant.fromEpochMillis(0),
+	}
+}
+
+case "a hold is still live a second before fifteen minutes" {
+	let now = Instant.fromEpochMillis(0) + 14.minutes + 59.seconds
+	expect isLive(placedAtEpoch(), now)
+}
+
+case "a hold has lapsed at exactly fifteen minutes" {
+	let now = Instant.fromEpochMillis(0) + 15.minutes
+	expect !isLive(placedAtEpoch(), now)
+}
+
+case "eight seats is the most a booking may hold" {
+	// `?` unwraps the `Ok`, and an `Err` would fail this case right here.
+	let most = Seats.of(8)?
+	expect most == Val[Seats](8)
+	expect Seats.of(9) is Err(_)
+	expect Seats.of(0) is Err(_)
+}
+
+case "a hold reference must look like H-0042" {
+	expect HoldId.of("H-0042") is Ok(_)
+	expect HoldId.of("0042") is Err(_)
+}
+
+case "a real group booking decodes" {
+	let r = Json.decode[HoldRequest](groupBooking)
+	expect r == Ok(HoldRequest { id: Val[HoldId]("H-0042"), seats: Val[Seats](8) })
+}
+
+case "decoding enforces the seat limit" {
+	let r = Json.decode[HoldRequest](tooManySeats)
+	expect r is Err(_)
+}

@@ -1,0 +1,69 @@
+---
+What a café till knows: the menu and the loyalty members.
+
+Looking something up may find nothing, and that is not an error. So every
+lookup here returns an `Option`, and leaves the caller to decide whether a
+missing value is a problem.
+---
+commons till.menu
+
+--- Something the café sells, priced in pence.
+type Product = {
+	sku: String,
+	name: String,
+	pence: Int,
+}
+
+--- A loyalty member and the discount, as a percentage, their card earns.
+type Member = {
+	card: String,
+	percent: Int,
+}
+
+--- Everything on the menu today.
+fn menu() -> List[Product] {
+	[
+		Product {
+			sku: "FLAT",
+			name: "Flat white",
+			pence: 320,
+		},
+		Product {
+			sku: "TEA",
+			name: "Pot of tea",
+			pence: 250,
+		},
+		Product {
+			sku: "BUN",
+			name: "Cinnamon bun",
+			pence: 295,
+		},
+	]
+}
+
+--- Everyone who has signed up for a loyalty card.
+fn members() -> List[Member] {
+	[Member { card: "L-1001", percent: 10 }, Member { card: "L-2002", percent: 25 }]
+}
+
+--- The product with this SKU, or `None` when the menu has no such thing.
+fn findProduct(sku: String) -> Option[Product] {
+	menu().filter((p) => p.sku == sku).first()
+}
+
+--- The member holding this card, or `None` for an unknown card.
+fn findMember(card: String) -> Option[Member] {
+	members().filter((m) => m.card == card).first()
+}
+
+---
+The discount a customer gets, as a percentage.
+
+Both steps may come up empty: the customer may have no card, and a card may
+not be one we know. `andThen` chains the second lookup onto the first, and
+`getOrElse` turns "no discount" into the plain number 0, so no `match` is
+needed.
+---
+fn discountFor(card: Option[String]) -> Int {
+	card.andThen(findMember).map((m) => m.percent).getOrElse(0)
+}

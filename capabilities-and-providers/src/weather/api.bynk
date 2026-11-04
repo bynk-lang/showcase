@@ -1,0 +1,80 @@
+context weather.api
+
+uses weather.forecast
+consumes bynk { Fetch, Logger, Secrets }
+
+---
+Why a forecast could not be had. The domain capability speaks in these terms,
+not in HTTP status codes, so a handler never needs to know a network is involved.
+---
+type ForecastError = enum { UnknownCity, Unavailable }
+
+---
+Our own capability: what the app needs, in its own words. A handler that is
+given `Forecasts` can ask for a forecast, and nothing else. Whether the answer
+comes from an HTTP API, a cache or a test stub is not its concern.
+---
+capability Forecasts {
+	fn today(city: City) -> Effect[Result[Forecast, ForecastError]]
+}
+
+---
+The production provider, composed over two platform capabilities. Its `given`
+names exactly what it uses: `Secrets` for the base URL and `Fetch` for the
+call. The composition root builds those first and hands them in.
+---
+provides Forecasts = HttpForecasts given Fetch, Secrets {
+	fn today(city: City) -> Effect[Result[Forecast, ForecastError]] {
+		let base <- Secrets.get("FORECAST_API_URL")
+		match base {
+			None => Err(Unavailable),
+			Some(url) => {
+				let res <- Fetch.send(Request {
+					method: Get,
+					url: "\(url)/today/\(city)",
+					contentType: None,
+					authorization: None,
+					headers: Map.empty(),
+					body: None,
+				})
+				match res {
+					Err(_) => Err(Unavailable),
+					Ok(r) => match r.status {
+						200 => match Json.decode[Forecast](r.body) {
+							Ok(f) => Ok(f),
+							Err(_) => Err(Unavailable),
+						},
+						404 => Err(UnknownCity),
+						_ => Err(Unavailable),
+					},
+				}
+			},
+		}
+	}
+}
+
+service api from http {
+	---
+	The handler's `given` is the whole story of what it touches: forecasts and
+	a log line. It cannot see `Fetch` or `Secrets`, so swapping the provider
+	never changes this code.
+	---
+	on GET("/forecast/:city") (
+		city: String
+	) -> Effect[HttpResult[String]] by Visitor given Forecasts, Logger {
+		match City.of(city) {
+			Err(_) => BadRequest("a city is lowercase letters and hyphens, such as new-york"),
+			Ok(c) => {
+				let found <- Forecasts.today(c)
+				match found {
+					Ok(f) => Ok(advice(f)),
+					Err(UnknownCity) => NotFound,
+					Err(Unavailable) => {
+						do Logger.warn("forecast unavailable for \(c)")
+						ServiceUnavailable("no forecast right now, try again later")
+					},
+				}
+			},
+		}
+	}
+}

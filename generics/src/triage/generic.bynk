@@ -1,0 +1,74 @@
+---
+Generic building blocks that know nothing about tickets. Each type
+parameter carries exactly the bound its body needs, so the signature tells
+a caller what it must supply.
+---
+commons triage.generic
+
+uses bynk.list
+
+---
+How many times `x` appears in `xs`. Comparing with `==` is the only thing
+this does to a `T`, so `T: Eq` is the whole requirement.
+---
+fn occurrences[T: Eq](xs: List[T], x: T) -> Int {
+	xs.filter((y) => y == x).length()
+}
+
+---
+Pins `x` between `lo` and `hi`. `<` and `>` need an order, so `T: Ord`.
+`Ord` implies `Eq`, so there is no need to write both.
+---
+fn clamp[T: Ord](x: T, lo: T, hi: T) -> T {
+	if x < lo { lo } else { if x > hi { hi } else { x } }
+}
+
+---
+Counts the items of `xs` under the key `key` gives each one. `K` keys a
+`Map`, so it is `Key`; `V` is only passed to `key`, so it stays unbounded
+and any type will do.
+---
+fn countBy[K: Key, V](xs: List[V], key: V -> K) -> Map[K, Int] {
+	let init: Map[K, Int] = Map.empty()
+	xs.fold(init, (acc, x) => {
+		let k = key(x)
+		let seen = match acc.get(k) {
+			Some(n) => n,
+			None => 0,
+		}
+		acc.insert(k, seen + 1)
+	})
+}
+
+---
+A list kept in ascending order. The bound sits on the type, so every
+method sees `T: Ord` without restating it. Build one through the statics
+below, which live under the type's own name, and it starts sorted and
+stays sorted.
+---
+type Sorted[T: Ord] = {
+	items: List[T],
+}
+
+--- Sorts `xs` once, on the way in. `T` is inferred from the argument.
+fn Sorted.fromList(xs: List[T]) -> Sorted[T] {
+	Sorted { items: sort(xs) }
+}
+
+---
+An empty `Sorted`. With no argument to infer `T` from, the caller names it
+(`Sorted.empty[Int]()`) or gives an expected type.
+---
+fn Sorted.empty() -> Sorted[T] {
+	Sorted { items: [] }
+}
+
+--- A copy with `x` added in its place.
+fn Sorted.insert(self, x: T) -> Sorted[T] {
+	Sorted { items: sort(self.items.prepend(x)) }
+}
+
+--- The smallest item, or `None` when empty.
+fn Sorted.first(self) -> Option[T] {
+	self.items.get(0)
+}

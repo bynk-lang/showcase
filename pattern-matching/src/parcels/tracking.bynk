@@ -1,0 +1,104 @@
+commons parcels.tracking
+
+uses parcels.parcel
+
+---
+A customer-facing line for a status.
+
+`match` must cover every variant, so adding a fifth `Status` turns this
+function into a compile error until it says something about the new case.
+---
+fn describe(status: Status) -> String {
+	match status {
+		Booked => "booked, awaiting collection",
+		InTransit(hub, 0) => "out for delivery from \(hub)",
+		InTransit(hub, daysLeft) => "at \(hub), \(daysLeft) days away",
+		Delivered(signedBy) => "delivered, signed for by \(signedBy)",
+		Returned(Refused) => "returned: the recipient refused it",
+		Returned(BadAddress) => "returned: the address was wrong",
+		Returned(Unclaimed) => "returned: nobody collected it",
+	}
+}
+
+---
+The postage, in pence, for a parcel of `grams`; `None` when it cannot be sent.
+
+Range patterns cover every `Int` between them, so the compiler would name a
+gap between two bands; an `if` chain would just fall through.
+---
+fn postage(grams: Int) -> Option[Int] {
+	match grams {
+		..0 => None,
+		1..100 => Some(85),
+		101..2000 => Some(320),
+		2001..20000 => Some(695),
+		20001.. => None,
+	}
+}
+
+---
+How to summarise the hubs a parcel has passed through.
+
+A list pattern checks the length and takes the elements in one step, with
+no `length()` test followed by `get(0)` that might still be `None`.
+---
+fn route(scans: List[String]) -> String {
+	match scans {
+		[] => "not scanned yet",
+		[origin] => "scanned at \(origin)",
+		[origin, latest] => "\(origin) to \(latest)",
+		[origin, _, ..] => "from \(origin) via \(scans.length() - 1) more hubs",
+	}
+}
+
+---
+What the depot should do about a parcel, if anything.
+
+A record pattern looks inside the parcel and its status at once. Each
+pattern ends with `..`, so a new `Parcel` field never breaks these arms.
+---
+fn nextAction(parcel: Parcel) -> String {
+	match parcel {
+		Parcel { status: Returned(BadAddress), id, .. } => "correct the address on \(id)",
+		Parcel { status: Returned(_), id, .. } => "restock \(id)",
+		Parcel { status: InTransit(_, 0), grams: 20001.., .. } => "send a two-person crew",
+		_ => "nothing to do",
+	}
+}
+
+---
+The hub a parcel is at, if it is on the road.
+
+`is` is a one-branch test: it binds `hub` for the then-branch only, where a
+`match` would need an arm for every other status.
+---
+fn currentHub(parcel: Parcel) -> Option[String] {
+	if parcel.status is InTransit(hub, _) { Some(hub) } else { None }
+}
+
+--- Whether a parcel's journey is over, one way or the other.
+fn isSettled(status: Status) -> Bool {
+	status is Delivered(_) | Returned(_)
+}
+
+---
+Who signed for a parcel, as proof of delivery.
+
+The pattern can fail (the parcel may not be delivered), so the `let` needs
+an `else`; after it, `signedBy` is in scope for the rest of the block.
+---
+fn signature(parcel: Parcel) -> Option[String] {
+	let Parcel { status: Delivered(signedBy), .. } = parcel else { None }
+	Some(signedBy)
+}
+
+---
+A one-line label for the depot screen.
+
+The `let` pattern cannot fail, so it needs no `else`: it just binds the
+three fields in one line instead of three.
+---
+fn label(parcel: Parcel) -> String {
+	let Parcel { id, grams, status, .. } = parcel
+	"\(id) (\(grams)g): \(describe(status))"
+}

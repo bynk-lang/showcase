@@ -1,0 +1,38 @@
+commons stockroom.goods
+
+--- A stock-keeping unit: the code on a product's shelf label.
+type Sku = String where NonEmpty
+
+--- The aisle a product is shelved in.
+type Aisle = String where NonEmpty
+
+--- A quantity moved in one go. Always positive, so a zero restock is refused at the boundary.
+type Qty = Int where Positive
+
+---
+A short code a customer quotes at the till to collect an item they set aside.
+---
+type HoldCode = String where NonEmpty && MaxLength(12)
+
+type Product = {
+	sku: Sku,
+	aisle: Aisle,
+	priceCents: Int,
+	onHand: Int,
+}
+
+--- One entry in the stock history: units of a product that arrived.
+type Delivery = {
+	sku: Sku,
+	qty: Qty,
+}
+
+---
+One row of the per-aisle report. Bynk has no anonymous tuples, so `groupBy`
+projects each group into a named record like this one.
+---
+type AisleStock = {
+	aisle: Aisle,
+	products: Int,
+	units: Int,
+}

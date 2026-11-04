@@ -1,0 +1,64 @@
+suite triage.tickets {
+	fn ticket(id: String, priority: Priority, opened: Int, product: String) -> Ticket {
+		Ticket {
+			priority,
+			opened,
+			id,
+			team: Team {
+				product,
+				region: "eu",
+			},
+		}
+	}
+
+	fn sample() -> List[Ticket] {
+		[
+			ticket("T-1", Low, 5, "billing"),
+			ticket("T-2", Urgent, 30, "login"),
+			ticket("T-3", Normal, 10, "billing"),
+			ticket("T-4", Urgent, 20, "billing"),
+		]
+	}
+
+	case "enum order is declaration order" {
+		expect Urgent < Normal
+		expect Normal < Low
+	}
+
+	case "the next ticket is the most urgent, then the oldest" {
+		expect nextUp(sample()).map((t) => t.id) == Some("T-4")
+	}
+
+	case "there is no next ticket in an empty queue" {
+		expect nextUp([]) is None
+	}
+
+	case "the worklist is in working order" {
+		let ids = worklist(sample()).items.map((t) => t.id)
+		expect ids == ["T-4", "T-2", "T-3", "T-1"]
+	}
+
+	case "a later field only breaks ties" {
+		let early = ticket("T-9", Normal, 1, "login")
+		let late = ticket("T-0", Normal, 2, "login")
+		expect early < late
+	}
+
+	case "urgentCount uses the Eq-bounded generic" {
+		expect urgentCount(sample()) == 2
+		expect urgentCount([]) == 0
+	}
+
+	case "an automatic rule cannot set Urgent" {
+		expect automatic(Urgent) == Normal
+		expect automatic(Normal) == Normal
+		expect automatic(Low) == Low
+	}
+
+	case "load keys the map by a whole Team record" {
+		let byTeam = load(sample())
+		expect byTeam.get(Team { product: "billing", region: "eu" }) == Some(3)
+		expect byTeam.get(Team { product: "login", region: "eu" }) == Some(1)
+		expect byTeam.get(Team { product: "login", region: "us" }) == None
+	}
+}

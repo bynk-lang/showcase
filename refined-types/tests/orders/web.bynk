@@ -1,0 +1,31 @@
+suite orders.web as system {
+	case "a valid line is quoted" {
+		let r <- api.POST("/quotes", Line { sku: "TEA-0042", qty: 2 }) by Visitor
+		expect r is Ok(500)
+	}
+
+	case "a quantity of zero is refused before the handler runs" {
+		let r <- api.POST("/quotes", Wire("{\"sku\": \"TEA-0042\", \"qty\": 0}")) by Visitor
+		expect r is Rejected(RefinementViolation(_))
+	}
+
+	case "a malformed sku in the body is refused" {
+		let r <- api.POST("/quotes", Wire("{\"sku\": \"tea\", \"qty\": 2}")) by Visitor
+		expect r is Rejected(RefinementViolation(_))
+	}
+
+	case "valid raw input reaches the handler" {
+		let r <- api.POST("/quotes", Wire("{\"sku\": \"TEA-0042\", \"qty\": 99}")) by Visitor
+		expect r is Handled(Ok(24750))
+	}
+
+	case "a valid sku in the path starts a line" {
+		let r <- api.POST("/lines/:sku", "TEA-0042") by Visitor
+		expect r is Created(_)
+	}
+
+	case "a malformed sku in the path is refused" {
+		let r <- api.POST("/lines/:sku", Wire("not-a-sku")) by Visitor
+		expect r is Rejected(RefinementViolation(_))
+	}
+}

@@ -1,0 +1,66 @@
+suite till.order {
+	case "a good line is priced" {
+		expect priceLine("FLAT", "2") == Ok(640)
+	}
+
+	case "an unknown product is refused by name" {
+		expect priceLine("LATTE", "2") == Err(UnknownProduct("LATTE"))
+	}
+
+	case "text that is not a number is refused" {
+		expect priceLine("TEA", "two") == Err(NotANumber("two"))
+	}
+
+	case "a quantity outside 1 to 20 is refused" {
+		expect priceLine("TEA", "0") == Err(OutOfRange(0))
+		expect priceLine("TEA", "21") == Err(OutOfRange(21))
+	}
+
+	case "the quantity bounds themselves are accepted" {
+		expect priceLine("TEA", "1") == Ok(250)
+		expect priceLine("TEA", "20") == Ok(5000)
+	}
+
+	case "the first failing step is the one reported" {
+		expect priceLine("LATTE", "two") == Err(UnknownProduct("LATTE"))
+	}
+
+	case "an order is the sum of its lines" {
+		let lines = [Line { sku: "FLAT", quantity: "2" }, Line { sku: "BUN", quantity: "1" }]
+		expect subtotal(lines) == Ok(935)
+	}
+
+	case "one bad line refuses the whole order" {
+		let lines = [Line { sku: "FLAT", quantity: "2" }, Line { sku: "BUN", quantity: "lots" }]
+		expect subtotal(lines) == Err(NotANumber("lots"))
+	}
+
+	case "an empty order costs nothing" {
+		expect subtotal([]) == Ok(0)
+	}
+
+	case "a loyalty card takes its discount off the total" {
+		let lines = [Line { sku: "TEA", quantity: "4" }]
+		expect total(lines, Some("L-1001")) == Ok(900)
+		expect total(lines, None) == Ok(1000)
+	}
+
+	case "a discount does not hide a bad line" {
+		let lines = [Line { sku: "LATTE", quantity: "1" }]
+		expect total(lines, Some("L-1001")) == Err(UnknownProduct("LATTE"))
+	}
+
+	case "the display shows a price or nothing" {
+		expect preview("BUN", "2") == Some(590)
+		expect preview("BUN", "99") == None
+	}
+
+	case "a receipt line shows the price" {
+		expect receiptLine("FLAT", "1") == "1 x FLAT: 320p"
+	}
+
+	case "a refused receipt line says why" {
+		expect receiptLine("FLAT", "99") == "refused: 99 is not between 1 and 20"
+		expect receiptLine("MOCHA", "1") == "refused: we don't sell MOCHA"
+	}
+}

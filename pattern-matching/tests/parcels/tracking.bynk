@@ -1,0 +1,77 @@
+suite parcels.tracking
+
+--- A parcel with only the fields a case cares about varied.
+fn parcel(status: Status, grams: Int) -> Parcel {
+	Parcel {
+		id: "P-1",
+		grams: grams,
+		status: status,
+		scans: [],
+	}
+}
+
+case "describe covers every status" {
+	expect describe(Booked) == "booked, awaiting collection"
+	expect describe(InTransit("Leeds", 2)) == "at Leeds, 2 days away"
+	expect describe(Delivered("A. Patel")) == "delivered, signed for by A. Patel"
+	expect describe(Returned(Refused)) == "returned: the recipient refused it"
+	expect describe(Returned(BadAddress)) == "returned: the address was wrong"
+	expect describe(Returned(Unclaimed)) == "returned: nobody collected it"
+}
+
+case "a literal in the payload picks out the last day" {
+	expect describe(InTransit("Leeds", 0)) == "out for delivery from Leeds"
+}
+
+case "postage bands include both ends" {
+	expect postage(1) == Some(85)
+	expect postage(100) == Some(85)
+	expect postage(101) == Some(320)
+	expect postage(20000) == Some(695)
+}
+
+case "postage refuses weights outside every band" {
+	expect postage(0) is None
+	expect postage(-5) is None
+	expect postage(20_001) is None
+}
+
+case "route reads the list's shape" {
+	expect route([]) == "not scanned yet"
+	expect route(["York"]) == "scanned at York"
+	expect route(["York", "Leeds"]) == "York to Leeds"
+	expect route(["York", "Leeds", "Crewe", "Bath"]) == "from York via 3 more hubs"
+}
+
+case "nextAction matches inside the record and its status" {
+	expect nextAction(parcel(Returned(BadAddress), 500)) == "correct the address on P-1"
+	expect nextAction(parcel(Returned(Refused), 500)) == "restock P-1"
+	expect nextAction(parcel(InTransit("Hull", 0), 25000)) == "send a two-person crew"
+}
+
+case "nextAction falls through when no field matches" {
+	expect nextAction(parcel(InTransit("Hull", 0), 20000)) == "nothing to do"
+	expect nextAction(parcel(InTransit("Hull", 1), 25000)) == "nothing to do"
+	expect nextAction(parcel(Booked, 500)) == "nothing to do"
+}
+
+case "is binds the hub only when in transit" {
+	expect currentHub(parcel(InTransit("Hull", 1), 500)) == Some("Hull")
+	expect currentHub(parcel(Booked, 500)) is None
+}
+
+case "is with an or-pattern" {
+	expect isSettled(Delivered("Sam"))
+	expect isSettled(Returned(Refused))
+	expect !isSettled(Booked)
+	expect !isSettled(InTransit("Hull", 1))
+}
+
+case "let else gives up on an undelivered parcel" {
+	expect signature(parcel(Delivered("Sam"), 500)) == Some("Sam")
+	expect signature(parcel(Booked, 500)) is None
+}
+
+case "let binds several fields at once" {
+	expect label(parcel(Booked, 500)) == "P-1 (500g): booked, awaiting collection"
+}

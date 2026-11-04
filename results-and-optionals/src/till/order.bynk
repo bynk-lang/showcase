@@ -1,0 +1,109 @@
+---
+Pricing an order line typed in at the till.
+
+A line can be wrong in several ways, and the till has to say which. So each
+step returns a `Result` with [OrderError] as its error, and the steps are
+joined with `?` and the `Result` combinators.
+---
+commons till.order
+
+uses till.menu
+
+--- How many of one item a single line may ask for.
+type Quantity = Int where InRange(1, 20)
+
+---
+Why an order line was refused.
+
+A domain error type, not a `String`: each variant carries what the till needs
+to explain the problem, and a `match` on it must cover every case.
+---
+type OrderError =
+	| UnknownProduct(sku: String)
+	| NotANumber(text: String)
+	| OutOfRange(quantity: Int)
+
+---
+The quantity typed in, checked.
+
+`Int.parse` returns an `Option`: it says only that the text was not a number,
+and `okOr` turns that absence into the error we want to report. `Quantity.of`
+fails with a `ValidationError`, which `mapErr` replaces with our own variant,
+so every caller sees the one error type.
+---
+fn parseQuantity(text: String) -> Result[Quantity, OrderError] {
+	let n = Int.parse(text).okOr(NotANumber(text))?
+	Quantity.of(n).mapErr((invalid) => OutOfRange(n))
+}
+
+---
+The price of one line, in pence.
+
+Each `?` unwraps a success or returns the failure straight to the caller, so
+the happy path reads top to bottom. An unknown SKU is absent from the menu,
+which is an `Option`; here it is a mistake, so `okOr` makes it an error.
+---
+fn priceLine(sku: String, quantity: String) -> Result[Int, OrderError] {
+	let product = findProduct(sku).okOr(UnknownProduct(sku))?
+	let n = parseQuantity(quantity)?
+	Ok(product.pence * n)
+}
+
+--- One line as it was typed in.
+type Line = {
+	sku: String,
+	quantity: String,
+}
+
+---
+The total for a whole order, before any discount.
+
+`sequenceTry` stops at the first bad line, which is all the till needs to
+ask the customer to fix it.
+---
+fn subtotal(lines: List[Line]) -> Result[Int, OrderError] {
+	let prices = lines.map((l) => priceLine(l.sku, l.quantity)).sequenceTry()?
+	Ok(prices.sum((p) => p))
+}
+
+---
+What the customer pays: the subtotal, less any loyalty discount.
+
+The card is optional and its absence is fine; a bad line is not, and its
+error passes through unchanged.
+---
+fn total(lines: List[Line], card: Option[String]) -> Result[Int, OrderError] {
+	subtotal(lines).map((pence) => pence - pence * discountFor(card) / 100)
+}
+
+---
+A price for the customer display, which shows a price or nothing.
+
+The display has no room for a reason, so `ok()` drops the error and keeps
+an `Option`.
+---
+fn preview(sku: String, quantity: String) -> Option[Int] {
+	priceLine(sku, quantity).ok()
+}
+
+--- What the till says about a refused line.
+fn explain(error: OrderError) -> String {
+	match error {
+		UnknownProduct(sku) => "we don't sell \(sku)",
+		NotANumber(text) => "\"\(text)\" is not a number",
+		OutOfRange(n) => "\(n) is not between 1 and 20",
+	}
+}
+
+---
+The receipt text for one line.
+
+`let ... else match` binds the price when the line is good. When it is not,
+the `else match` arm sees the error and its value becomes the result instead.
+---
+fn receiptLine(sku: String, quantity: String) -> String {
+	let Ok(pence) = priceLine(sku, quantity) else match {
+		Err(error) => "refused: \(explain(error))",
+	}
+	"\(quantity) x \(sku): \(pence)p"
+}

@@ -1,0 +1,34 @@
+---
+The rules for a seat hold at a box office: who may hold how many seats, and
+for how long. Pure code in a commons, so its tests need no doubles at all.
+---
+commons holds.policy
+
+--- A hold reference as the box office prints it, such as `H-0042`.
+type HoldId = String where Matches("^H-[0-9]{4}$")
+
+--- One booking holds between one and eight seats.
+type Seats = Int where InRange(1, 8)
+
+--- What a customer asks for.
+type HoldRequest = {
+	id: HoldId,
+	seats: Seats,
+}
+
+--- A hold the desk has placed, stamped with the time it was placed.
+type Hold = {
+	id: HoldId,
+	seats: Seats,
+	placedAt: Instant,
+}
+
+--- The moment a hold lapses: fifteen minutes after it was placed.
+fn expiresAt(hold: Hold) -> Instant {
+	hold.placedAt + 15.minutes
+}
+
+--- Whether `hold` still holds its seats at `now`. The expiry instant itself is too late.
+fn isLive(hold: Hold, now: Instant) -> Bool {
+	now < expiresAt(hold)
+}

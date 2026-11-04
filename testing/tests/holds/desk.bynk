@@ -1,0 +1,59 @@
+---
+Tests for a context, driven through its HTTP handlers.
+
+The desk consumes `Clock` and `Kv`. Under test each is a deterministic
+double, fresh for every case: the clock reads the epoch, and `Kv` is an
+in-memory store that starts empty. A `stub` overrides one operation where a
+case needs a different answer; every other operation keeps its double.
+---
+suite holds.desk
+
+--- A hold request where the details don't matter to the case.
+fn anyRequest() -> HoldRequest {
+	HoldRequest {
+		id: Val[HoldId]("H-0001"),
+		seats: Val[Seats],
+	}
+}
+
+case "a new hold is stamped with the clock's time, which is the epoch" {
+	let r <- api.POST("/holds", anyRequest()) by Visitor
+	match r {
+		Created(hold) => expect hold.placedAt == Instant.fromEpochMillis(0),
+		_ => expect false,
+	}
+}
+
+case "a placed hold can be read back from the in-memory Kv" {
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	expect r is Ok(_)
+	expect Kv.put called once
+}
+
+case "every case starts with an empty Kv" {
+	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	expect r is NotFound
+}
+
+case "a hold is still live a second before it lapses" {
+	// The first `now` stamps the hold; the second is the lookup.
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(0) + 14.minutes + 59.seconds]
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	expect r is Ok(_)
+}
+
+case "a hold is gone fifteen minutes after it was placed" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(0) + 15.minutes]
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	expect r is Gone
+}
+
+case "a failing store faults the lookup" {
+	// `fails` is a fault, not an `Err`: the handler cannot catch it, so the
+	// case claims it with `faults` on the call itself.
+	stub Kv.get(_) fails
+	expect api.GET("/holds/:id", "H-0001") by Visitor faults
+}

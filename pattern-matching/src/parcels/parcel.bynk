@@ -1,0 +1,26 @@
+commons parcels.parcel
+
+--- Why a parcel came back to the depot.
+type ReturnReason = enum { Refused, BadAddress, Unclaimed }
+
+---
+Where a parcel is in its journey.
+
+A sum type, not a status string plus optional fields: each variant carries
+only the data that makes sense for it, so there is no `signedBy` to forget
+to check on a parcel that is still on the road.
+---
+type Status =
+	| Booked
+	| InTransit(hub: String, daysLeft: Int)
+	| Delivered(signedBy: String)
+	| Returned(reason: ReturnReason)
+
+--- A parcel as the depot sees it.
+type Parcel = {
+	id: String,
+	grams: Int,
+	status: Status,
+	--- The hubs that scanned the parcel, oldest first.
+	scans: List[String],
+}

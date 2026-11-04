@@ -1,0 +1,71 @@
+suite helpdesk.desk {
+	// Each case addresses its own ticket key, so no state leaks between cases.
+
+	case "a fresh ticket starts Open, unassigned" {
+		let t <- Ticket(Val[TicketId]("t-new")).view()
+		expect t.status == Open
+		expect t.assignee is None
+		expect t.reopens == 0
+	}
+
+	case "the happy path walks every state" {
+		let t = Ticket(Val[TicketId]("t-happy"))
+		let started <- t.start(Val[Engineer]("ada"))
+		expect started == Ok(InProgress)
+		let resolved <- t.resolve()
+		expect resolved == Ok(Resolved)
+		let closed <- t.close()
+		expect closed == Ok(Closed)
+		let v <- t.view()
+		expect v.status == Closed
+		expect v.assignee == Some(Val[Engineer]("ada"))
+	}
+
+	case "a move from the wrong state is refused and changes nothing" {
+		let t = Ticket(Val[TicketId]("t-early"))
+		let r <- t.close()
+		expect r == Err(WrongState(Open))
+		let v <- t.view()
+		expect v.status == Open
+	}
+
+	case "a closed ticket refuses every move" {
+		let t = Ticket(Val[TicketId]("t-done"))
+		let _ <- t.start(Val[Engineer]("ada"))
+		let _ <- t.resolve()
+		let _ <- t.close()
+		let reopened <- t.reopen()
+		expect reopened == Err(WrongState(Closed))
+		let restarted <- t.start(Val[Engineer]("grace"))
+		expect restarted == Err(WrongState(Closed))
+	}
+
+	case "a third reopen breaks the invariant: it faults and persists nothing" {
+		let t = Ticket(Val[TicketId]("t-flaky"))
+		let _ <- t.start(Val[Engineer]("ada"))
+		let _ <- t.resolve()
+		let _ <- t.reopen()
+		let _ <- t.resolve()
+		let _ <- t.reopen()
+		let _ <- t.resolve()
+		expect t.reopen() faults
+		let v <- t.view()
+		expect v.status == Resolved
+		expect v.reopens == 2
+	}
+
+	case "tickets are independent instances" {
+		let _ <- Ticket(Val[TicketId]("t-a")).start(Val[Engineer]("ada"))
+		let b <- Ticket(Val[TicketId]("t-b")).view()
+		expect b.status == Open
+	}
+
+	case "over HTTP, a refused move is 409 Conflict" {
+		let r <- api.POST("/tickets/:id/resolve", Val[TicketId]("t-http")) by Visitor
+		expect r is Conflict(_)
+		let started <- api.POST("/tickets/:id/start", Val[TicketId]("t-http"), StartRequest {
+			engineer: Val[Engineer]("ada"),
+		}) by Visitor
+		expect started == Ok(InProgress)
+	}
+}

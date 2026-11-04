@@ -1,0 +1,153 @@
+context helpdesk.desk
+
+type TicketId = String where NonEmpty
+
+type Engineer = String where NonEmpty
+
+---
+Where a ticket is in its life. Each variant is one state of the machine; a
+ticket starts `Open` and ends `Closed`.
+---
+type Status = enum { Open, InProgress, Resolved, Closed }
+
+---
+Why a move was refused. A wrong-state request is an ordinary outcome, so it
+is a value a calling handler can match on. It carries the state the ticket was
+actually in; the HTTP edge reports it only as a `409`.
+---
+type Rejection =
+	| WrongState(current: Status)
+
+--- What a reader of the ticket sees.
+type TicketView = {
+	status: Status,
+	assignee: Option[Engineer],
+	reopens: Int,
+}
+
+--- The body of `POST /tickets/:id/start`.
+type StartRequest = {
+	engineer: Engineer,
+}
+
+---
+One support ticket. Each `TicketId` addresses its own instance (a Durable
+Object on Cloudflare), so tickets never share state. `status` is the state
+machine; `assignee` and `reopens` are the extended state that rides along.
+---
+agent Ticket {
+	key id: TicketId
+
+	// A sum has no zero, so the initialiser names the start state.
+	store status: Cell[Status] = Open
+	store assignee: Cell[Option[Engineer]]
+	store reopens: Cell[Int]
+
+	--- Nobody works on a ticket without an owner.
+	invariant worked_has_assignee:
+		(status == InProgress || status == Resolved) implies assignee.isSome()
+
+	---
+	A ticket may be reopened at most twice. No handler checks this: the
+	invariant is the guard, so a third `reopen` faults (a 500 to the caller)
+	and the offending state is never written.
+	---
+	invariant reopen_cap:
+		reopens <= 2
+
+	--- Once closed, a ticket stays closed: a claim about every step, not one state.
+	transition closed_is_final:
+		old.status is Closed implies new.status is Closed
+
+	on call view() -> Effect[TicketView] {
+		TicketView {
+			status: status,
+			assignee: assignee,
+			reopens: reopens,
+		}
+	}
+
+	--- `Open → InProgress`, assigning the engineer who picked it up.
+	on call start(engineer: Engineer) -> Effect[Result[Status, Rejection]] {
+		match status {
+			Open => {
+				status := InProgress
+				assignee := Some(engineer)
+				Ok(InProgress)
+			},
+			current => Err(WrongState(current)),
+		}
+	}
+
+	--- `InProgress → Resolved`.
+	on call resolve() -> Effect[Result[Status, Rejection]] {
+		match status {
+			InProgress => {
+				status := Resolved
+				Ok(Resolved)
+			},
+			current => Err(WrongState(current)),
+		}
+	}
+
+	--- `Resolved → InProgress`, back to the same engineer.
+	on call reopen() -> Effect[Result[Status, Rejection]] {
+		match status {
+			Resolved => {
+				status := InProgress
+				let _ <- reopens.update((n) => n + 1)
+				Ok(InProgress)
+			},
+			current => Err(WrongState(current)),
+		}
+	}
+
+	--- `Resolved → Closed`, the terminal state.
+	on call close() -> Effect[Result[Status, Rejection]] {
+		match status {
+			Resolved => {
+				status := Closed
+				Ok(Closed)
+			},
+			current => Err(WrongState(current)),
+		}
+	}
+}
+
+--- A refused move becomes `409 Conflict`; the ticket's state is unchanged.
+fn reply(outcome: Result[Status, Rejection]) -> HttpResult[Status] {
+	match outcome {
+		Ok(next) => Ok(next),
+		Err(WrongState(_)) => Conflict("that move is not allowed from the ticket's current state"),
+	}
+}
+
+service api from http {
+	on GET("/tickets/:id") (id: TicketId) -> Effect[HttpResult[TicketView]] by Visitor {
+		let ticket <- Ticket(id).view()
+		Ok(ticket)
+	}
+
+	on POST("/tickets/:id/start") (
+		id: TicketId,
+		body: StartRequest
+	) -> Effect[HttpResult[Status]] by Visitor {
+		let outcome <- Ticket(id).start(body.engineer)
+		reply(outcome)
+	}
+
+	on POST("/tickets/:id/resolve") (id: TicketId) -> Effect[HttpResult[Status]] by Visitor {
+		let outcome <- Ticket(id).resolve()
+		reply(outcome)
+	}
+
+	on POST("/tickets/:id/reopen") (id: TicketId) -> Effect[HttpResult[Status]] by Visitor {
+		let outcome <- Ticket(id).reopen()
+		reply(outcome)
+	}
+
+	on POST("/tickets/:id/close") (id: TicketId) -> Effect[HttpResult[Status]] by Visitor {
+		let outcome <- Ticket(id).close()
+		reply(outcome)
+	}
+}
