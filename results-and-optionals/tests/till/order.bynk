@@ -1,6 +1,6 @@
 suite till.order {
 	case "a good line is priced" {
-		expect priceLine("FLAT", "2") == Ok(640)
+		expect priceLine("FLAT", "2") == Ok(Priced { quantity: 2, pence: 640 })
 	}
 
 	case "an unknown product is refused by name" {
@@ -12,13 +12,13 @@ suite till.order {
 	}
 
 	case "a quantity outside 1 to 20 is refused" {
-		expect priceLine("TEA", "0") == Err(OutOfRange(0))
-		expect priceLine("TEA", "21") == Err(OutOfRange(21))
+		expect priceLine("TEA", "0") == Err(OutOfRange(0, "must be in range [1, 20]"))
+		expect priceLine("TEA", "21") == Err(OutOfRange(21, "must be in range [1, 20]"))
 	}
 
 	case "the quantity bounds themselves are accepted" {
-		expect priceLine("TEA", "1") == Ok(250)
-		expect priceLine("TEA", "20") == Ok(5000)
+		expect priceLine("TEA", "1") == Ok(Priced { quantity: 1, pence: 250 })
+		expect priceLine("TEA", "20") == Ok(Priced { quantity: 20, pence: 5000 })
 	}
 
 	case "the first failing step is the one reported" {
@@ -59,8 +59,12 @@ suite till.order {
 		expect receiptLine("FLAT", "1") == "1 x FLAT: 320p"
 	}
 
+	case "a receipt line prints the quantity as parsed, not as typed" {
+		expect receiptLine("FLAT", "02") == "2 x FLAT: 640p"
+	}
+
 	case "a refused receipt line says why" {
-		expect receiptLine("FLAT", "99") == "refused: 99 is not between 1 and 20"
+		expect receiptLine("FLAT", "99") == "refused: 99 must be in range [1, 20]"
 		expect receiptLine("MOCHA", "1") == "refused: we don't sell MOCHA"
 	}
 }

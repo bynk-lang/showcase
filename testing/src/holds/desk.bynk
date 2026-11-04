@@ -12,16 +12,32 @@ consumes bynk { Clock }
 consumes bynk.cloudflare { Kv }
 
 service api from http {
-	--- Place a hold, stamped with the current time.
+	---
+	Place a hold, stamped with the current time. A hold that is still live
+	can't be replaced, so nobody can extend it or take it over. `Kv` drops the
+	entry when the hold lapses, so lapsed holds don't pile up.
+	---
 	on POST("/holds") (body: HoldRequest) -> Effect[HttpResult[Hold]] by Visitor given Clock, Kv {
 		let now <- Clock.now()
-		let hold = Hold {
-			id: body.id,
-			seats: body.seats,
-			placedAt: now,
+		let stored <- Kv.get(keyOf(body.id))
+		let taken = match stored {
+			None => false,
+			Some(text) => match Json.decode[Hold](text) {
+				Err(_) => false,
+				Ok(held) => isLive(held, now),
+			},
 		}
-		let _ <- Kv.put(keyOf(body.id), Json.encode(hold))
-		Created(hold)
+		if taken {
+			Conflict("hold \(body.id) is already placed")
+		} else {
+			let hold = Hold {
+				id: body.id,
+				seats: body.seats,
+				placedAt: now,
+			}
+			let _ <- Kv.putTtl(keyOf(body.id), Json.encode(hold), HoldFor.toMillis() / 1000)
+			Created(hold)
+		}
 	}
 
 	--- Look up a hold: `Gone` once it has lapsed, `NotFound` if it never existed.

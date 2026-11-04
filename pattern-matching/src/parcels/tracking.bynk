@@ -47,7 +47,7 @@ fn route(scans: List[String]) -> String {
 		[] => "not scanned yet",
 		[origin] => "scanned at \(origin)",
 		[origin, latest] => "\(origin) to \(latest)",
-		[origin, _, ..] => "from \(origin) via \(scans.length() - 1) more hubs",
+		[origin, _, ..] => "from \(origin), then \(scans.length() - 1) more hubs",
 	}
 }
 

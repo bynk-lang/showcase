@@ -86,15 +86,15 @@ case "restocking an unknown product is refused and logs nothing" {
 	expect n == 0
 }
 
-case "a hold is collectable within its 15 minutes" {
-	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(840000)]
+case "a hold is collectable up to the last millisecond of its 15 minutes" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(899999)]
 	do Stockroom("d").hold("ANN-1", "tea")
 	let item <- Stockroom("d").held("ANN-1")
 	expect item == Some("tea")
 }
 
-case "a hold lapses after 15 minutes" {
-	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(960000)]
+case "a hold has lapsed at exactly 15 minutes" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(900000)]
 	do Stockroom("e").hold("ANN-1", "tea")
 	let item <- Stockroom("e").held("ANN-1")
 	expect item is None

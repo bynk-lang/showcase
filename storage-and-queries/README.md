@@ -80,9 +80,11 @@ as an argument, so it doesn't.
 
 [`tests/stockroom/shop.bynk`](tests/stockroom/shop.bynk) drives the agent
 directly. A handler's `List` result compares with `==`, so the tests assert on
-the sorted lists themselves. A stubbed `Clock` puts a hold just inside and just
-outside its 15 minutes, and `expect Clock.now called once` shows that the window
-reads never touch the clock.
+the sorted lists themselves. A stubbed `Clock` reads a hold a millisecond before
+its 15 minutes are up and again at exactly 15 minutes, when it has lapsed.
+`expect Clock.now called once` shows that the window reads never touch the
+clock. [`tests/stockroom/boundary.bynk`](tests/stockroom/boundary.bynk) sends raw
+JSON to show that a negative price or count never gets past the boundary.
 
 ## Run it
 

@@ -38,9 +38,13 @@ agent Stockroom {
 		match found {
 			None => Err(UnknownSku),
 			Some(p) => {
+				// Arithmetic drops the refinement, so the sum goes back through `Count.of`.
+				let Ok(onHand) = Count.of(p.onHand + qty) else match {
+					Err(_) => unreachable("a count plus a positive quantity is never negative"),
+				}
 				let restocked = Product {
 					...p,
-					onHand: p.onHand + qty,
+					onHand: onHand,
 				}
 				do products.put(sku, restocked)
 				do deliveries.append(Delivery { sku: sku, qty: qty })

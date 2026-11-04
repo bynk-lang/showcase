@@ -39,7 +39,7 @@ fn discountFor(card: Option[String]) -> Int {
 type OrderError =
 	| UnknownProduct(sku: String)
 	| NotANumber(text: String)
-	| OutOfRange(quantity: Int)
+	| OutOfRange(quantity: Int, rule: String)
 ```
 
 `parseQuantity` converts `Int.parse`'s `Option` with `okOr`, and the refined
@@ -47,10 +47,10 @@ type's `ValidationError` with `mapErr`, so callers see only `OrderError`.
 `priceLine` then reads top to bottom, each `?` returning the first failure:
 
 ```bynk
-fn priceLine(sku: String, quantity: String) -> Result[Int, OrderError] {
+fn priceLine(sku: String, quantity: String) -> Result[Priced, OrderError] {
 	let product = findProduct(sku).okOr(UnknownProduct(sku))?
 	let n = parseQuantity(quantity)?
-	Ok(product.pence * n)
+	Ok(Priced { quantity: n, pence: product.pence * n })
 }
 ```
 
@@ -60,7 +60,7 @@ with `sequenceTry`, `total` applies the optional discount with `map`,
 nothing, and `receiptLine` handles the error in place with `let … else match`:
 
 ```bynk
-let Ok(pence) = priceLine(sku, quantity) else match {
+let Ok(line) = priceLine(sku, quantity) else match {
 	Err(error) => "refused: \(explain(error))",
 }
 ```

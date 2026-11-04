@@ -28,7 +28,7 @@ case "a placed hold can be read back from the in-memory Kv" {
 	let _ <- api.POST("/holds", anyRequest()) by Visitor
 	let r <- api.GET("/holds/:id", "H-0001") by Visitor
 	expect r is Ok(_)
-	expect Kv.put called once
+	expect Kv.putTtl called once
 }
 
 case "every case starts with an empty Kv" {
@@ -49,6 +49,25 @@ case "a hold is gone fifteen minutes after it was placed" {
 	let _ <- api.POST("/holds", anyRequest()) by Visitor
 	let r <- api.GET("/holds/:id", "H-0001") by Visitor
 	expect r is Gone
+}
+
+case "a live hold can't be placed again" {
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	let again <- api.POST("/holds", anyRequest()) by Visitor
+	expect again is Conflict(_)
+	expect Kv.putTtl called once
+}
+
+case "a lapsed hold's id can be placed again" {
+	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(0) + 15.minutes]
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	let again <- api.POST("/holds", anyRequest()) by Visitor
+	expect again is Created(_)
+}
+
+case "the store is told to drop a hold when it lapses" {
+	let _ <- api.POST("/holds", anyRequest()) by Visitor
+	expect Kv.putTtl called once with ttlSeconds == 900
 }
 
 case "a failing store faults the lookup" {

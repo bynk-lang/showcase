@@ -43,8 +43,10 @@ fn countBy[K: Key, V](xs: List[V], key: V -> K) -> Map[K, Int] {
 ---
 A list kept in ascending order. The bound sits on the type, so every
 method sees `T: Ord` without restating it. Build one through the statics
-below, which live under the type's own name, and it starts sorted and
-stays sorted.
+below, which live under the type's own name: each one returns its items in
+order. `items` is still a public field, so a hand-written `Sorted { … }`
+literal can skip the sort: only a record can be generic, and an opaque type,
+which would hide the field, cannot.
 ---
 type Sorted[T: Ord] = {
 	items: List[T],
@@ -63,7 +65,10 @@ fn Sorted.empty() -> Sorted[T] {
 	Sorted { items: [] }
 }
 
---- A copy with `x` added in its place.
+---
+A copy with `x` added in its place. Re-sorting keeps this short. An ordered
+insert into the already-sorted list would be O(n) rather than O(n log n).
+---
 fn Sorted.insert(self, x: T) -> Sorted[T] {
 	Sorted { items: sort(self.items.prepend(x)) }
 }

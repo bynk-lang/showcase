@@ -31,7 +31,7 @@ handler is called.
 **`src/orders/stock.bynk`** declares the types. The predicates sit in the type:
 
 ```bynk
-type Sku = String where Matches("^[A-Z]{3}-[0-9]{4}$")
+type Sku = String where Matches("[A-Z]{3}-[0-9]{4}")
 
 --- How many of one item a single order line may ask for.
 type Quantity = Int where InRange(1, 99)

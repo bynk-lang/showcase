@@ -6,7 +6,7 @@ A stock-keeping unit: three capital letters, a dash, four digits.
 The pattern is part of the type, so a function that takes a `Sku` never
 has to ask whether the string is well formed.
 ---
-type Sku = String where Matches("^[A-Z]{3}-[0-9]{4}$")
+type Sku = String where Matches("[A-Z]{3}-[0-9]{4}")
 
 --- How many of one item a single order line may ask for.
 type Quantity = Int where InRange(1, 99)

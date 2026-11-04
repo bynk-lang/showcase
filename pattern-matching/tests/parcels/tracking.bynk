@@ -40,7 +40,7 @@ case "route reads the list's shape" {
 	expect route([]) == "not scanned yet"
 	expect route(["York"]) == "scanned at York"
 	expect route(["York", "Leeds"]) == "York to Leeds"
-	expect route(["York", "Leeds", "Crewe", "Bath"]) == "from York via 3 more hubs"
+	expect route(["York", "Leeds", "Crewe", "Bath"]) == "from York, then 3 more hubs"
 }
 
 case "nextAction matches inside the record and its status" {
