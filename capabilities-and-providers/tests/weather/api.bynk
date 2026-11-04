@@ -36,6 +36,11 @@ case "a badly spelt city is rejected before any capability is used" {
 	expect Forecasts.today never called
 }
 
+case "a stray hyphen is rejected too" {
+	let r <- api.GET("/forecast/:city", "london-") by Visitor
+	expect r is BadRequest(_)
+}
+
 // Leave `Forecasts` unstubbed and the real `HttpForecasts` provider runs,
 // composed over the platform doubles. Stub those instead to test it offline.
 

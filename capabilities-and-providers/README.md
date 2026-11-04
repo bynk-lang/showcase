@@ -74,7 +74,9 @@ visible and swappable:
 bynkc test .
 ```
 
-To serve it locally, point the provider at a forecast API:
+To serve it locally, point the provider at a forecast API: any server that
+answers `GET /today/<city>` with JSON such as
+`{"city":"london","highC":12,"summary":"drizzle"}`.
 
 ```sh
 bynk dev -- --var FORECAST_API_URL:https://forecast.example

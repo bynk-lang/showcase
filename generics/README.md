@@ -30,10 +30,10 @@ fn occurrences[T: Eq](xs: List[T], x: T) -> Int {
 }
 
 fn clamp[T: Ord](x: T, lo: T, hi: T) -> T {
-	if x < lo { lo } else if x > hi { hi } else { x }
+	if x < lo { lo } else { if x > hi { hi } else { x } }
 }
 
-fn countBy[K: Key, V](xs: List[V], key: (V) -> K) -> Map[K, Int] {
+fn countBy[K: Key, V](xs: List[V], key: V -> K) -> Map[K, Int] {
 ```
 
 `V` in `countBy` stays unbounded, because it is only handed to `key`. The same
