@@ -9,8 +9,8 @@ and reads come back as a typed `Book` record through `select[T]` and
 
 A `D1` capability is a SQLite database. You declare one by name,
 `capability Books = D1`. Its schema is a numbered SQL file in `migrations/`, so
-the shape of the table lives in one place and every test case starts with it
-applied.
+the shape of the table lives in one place, and every test case and `bynk dev`
+start with it applied.
 
 Three rules keep the SQL safe and the rows typed:
 
@@ -30,6 +30,12 @@ Three rules keep the SQL safe and the rows typed:
   arm `e` has its own type (`SqlError` or `JsonError`), so the handler can say
   exactly what went wrong.
 
+The record and the table should agree, and the database can hold up its end.
+The migration makes the table `STRICT` and repeats `Book`'s refinements as
+`CHECK`s, so no writer, the service or anyone else, can store a row `Book`
+refuses. A `Decode` error then means the schema and the record have drifted
+apart.
+
 ## Walkthrough
 
 [`migrations/shelf-library-books/0001_create_books.sql`](migrations/shelf-library-books/0001_create_books.sql)
@@ -37,32 +43,28 @@ creates the `books` table. The directory is named after the database, which
 Bynk derives from the context and the capability: `shelf.library`'s `Books` is
 `shelf-library-books`.
 
-[`src/shelf/books.bynk`](src/shelf/books.bynk) holds `Book`, the row type. Its
-fields are named exactly like the columns. `finished` is stored as `0` or `1`,
-because SQLite has no boolean, and a typed read takes those as a `Bool`.
+[`src/shelf/books.bynk`](src/shelf/books.bynk) holds `Book`, the row type, and
+`NewBook`, what a client sends. `Book`'s fields are named exactly like the
+columns. `finished` is stored as `0` or `1`, because SQLite has no boolean, and
+a typed read takes those as a `Bool`. `NewBook` has no `finished`: a book
+starts unread, and the column's `DEFAULT 0` says so.
 
 [`src/shelf/library.bynk`](src/shelf/library.bynk) is the service. An insert
-is a tagged multi-line statement with five bound parameters, and a duplicate
+is a tagged multi-line statement with four bound parameters, and a duplicate
 ISBN breaks the primary key, which becomes a `409`:
 
 ```bynk
 let added <- Books.run(
 	"""sql
-	INSERT INTO books (isbn, title, author, pages, finished)
-	VALUES (?1, ?2, ?3, ?4, ?5)
+	INSERT INTO books (isbn, title, author, pages)
+	VALUES (?1, ?2, ?3, ?4)
 	""",
-	[
-		Text(body.isbn),
-		Text(body.title),
-		Text(body.author),
-		Integer(body.pages),
-		Boolean(body.finished),
-	]
+	[Text(body.isbn), Text(body.title), Text(body.author), Integer(body.pages)]
 )
 match added {
-	Ok(_) => Created(body),
+	Ok(_) => Created(Book { … }),
 	Err(Constraint(_)) => Conflict("that ISBN is already on the shelf"),
-	Err(e) => ServerError(sqlReason(e)),
+	Err(e) => { … },
 }
 ```
 
@@ -81,23 +83,33 @@ let rows <- Books.select[Book](
 )
 match rows {
 	Ok(list) => Ok(list),
-	Err(Sql(e)) => ServerError(sqlReason(e)),
-	Err(Decode(e)) => ServerError(rowReason(e)),
+	Err(Sql(e)) => {
+		do Logger.error(sqlReason(e))
+		ServerError(unavailable())
+	},
+	Err(Decode(e)) => {
+		do Logger.error(rowReason(e))
+		ServerError(unavailable())
+	},
 }
 ```
+
+Those reasons name tables and columns, so they go to the `Logger`, and the
+caller gets a plain "the reading list is unavailable". `SqlError` is
+extensible, so `sqlReason`'s match keeps a wildcard.
 
 `GET /books/:isbn` uses `firstAs[Book]`, which gives `Option[Book]`, so no
 matching row is `NotFound`. Marking a book read is an `UPDATE`, and its
 `SqlRun.changes` tells a missing book (`0` rows changed) from a found one.
-`SqlError` is extensible, so `sqlReason`'s match keeps a wildcard.
 
 [`tests/shelf/library.bynk`](tests/shelf/library.bynk) runs against a real
 in-memory SQLite database, with the migration applied. The first case reads
-before writing anything, which shows the schema is already there. The two
-error cases reach under the service: a case can call `Books` directly. One
-stores the text `'n/a'` in the `INTEGER` `pages` column, which SQLite allows,
-and the read reports a `Decode` error at `$.pages`. The other drops the table,
-and the read reports a `Sql` error.
+before writing anything, which shows the schema is already there. A case can
+call `Books` directly, so the last three reach under the service. One writes a
+zero-page book and gets `Constraint` back from the `CHECK`. One swaps in a
+loose table holding a `finished` of `2`, and the read logs a `Decode` at
+`$.finished`. The last drops the table, and the read logs a `Sql` failure. In
+both, the caller sees only the plain message.
 
 ## Run it
 
@@ -106,8 +118,17 @@ bynkc test .
 bynk dev
 ```
 
-With `bynk dev` running, `POST /books` adds a book, `GET /unread` lists the
-ones still to read, and `POST /books/:isbn/finished` marks one read.
+`bynk dev` applies `migrations/` to its local database before it serves, so
+the table is there on the first request. Then:
+
+```sh
+curl -X POST localhost:8787/books -H 'content-type: application/json' \
+  -d '{"isbn": "9780156027601", "title": "Solaris", "author": "Stanisław Lem", "pages": 204}'
+curl localhost:8787/unread
+curl -X POST localhost:8787/books/9780156027601/finished
+curl localhost:8787/books/9780156027601
+# {"isbn":"9780156027601", …, "finished":true}
+```
 
 ## Read next
 

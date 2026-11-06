@@ -5,19 +5,29 @@ type Isbn = String where NonEmpty
 
 type Title = String where NonEmpty
 
+type Author = String where NonEmpty
+
 --- A page count. Positive, so a zero-page book is refused at the boundary.
 type Pages = Int where Positive
+
+--- What a client sends to add a book. Every book starts unread, so there is no `finished` here.
+type NewBook = {
+	isbn: Isbn,
+	title: Title,
+	author: Author,
+	pages: Pages,
+}
 
 ---
 One row of the `books` table. `select[Book]` writes the column list from these
 fields, in this order, so each field is named exactly like its column.
 `finished` is a SQLite `INTEGER` holding `0` or `1`, which a typed read takes as
-a `Bool`.
+a `Bool`. The migration's `CHECK`s hold the table to the same refinements.
 ---
 type Book = {
 	isbn: Isbn,
 	title: Title,
-	author: String,
+	author: Author,
 	pages: Pages,
 	finished: Bool,
 }

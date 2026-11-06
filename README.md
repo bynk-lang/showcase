@@ -20,7 +20,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`capabilities-and-providers`](capabilities-and-providers/) | `given`, declaring a capability, providing and wrapping one | [The capability model](https://bynk-lang.org/book/guides/effects-and-capabilities/understand-the-capability-model/) |
 | [`agent-state-machine`](agent-state-machine/) | agents, a `Cell`, and invariants | [State machine](https://bynk-lang.org/book/guides/agents-and-state/state-machine/) |
 | [`storage-and-queries`](storage-and-queries/) | agent storage (`Map`, `Cache`, `Log`) and `Query[T]` | [Agents](https://bynk-lang.org/book/reference/agents/) |
-| [`sql-databases`](sql-databases/) | a D1 database: migrations, `"""sql` statements, typed reads with `select[T]` and `firstAs[T]` | [Query rows into a record](https://bynk-lang.org/book/guides/effects-and-capabilities/query-rows-into-a-record/) |
+| [`sql-databases`](sql-databases/) | a D1 database: migrations, `"""sql` statements, typed reads with `select[T]` and `firstAs[T]`, `Sql` and `Decode` errors | [Query rows into a record](https://bynk-lang.org/book/guides/effects-and-capabilities/query-rows-into-a-record/) |
 | [`testing`](testing/) | tests in the language: stubs, platform doubles, fixtures | [Write tests](https://bynk-lang.org/book/guides/testing/write-tests/) |
 | [`actors-and-authorisation`](actors-and-authorisation/) | public and authenticated routes, claim checks, an agent keyed by the caller | [Authorisation](https://bynk-lang.org/book/guides/actors/authorisation/) |
 | [`verify-webhooks`](verify-webhooks/) | signed webhooks verified for you; signing your own data | [Verify webhooks](https://bynk-lang.org/book/guides/actors/verify-webhooks/) |

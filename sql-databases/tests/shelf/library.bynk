@@ -1,22 +1,20 @@
 suite shelf.library
 
-fn dune() -> Book {
-	Book {
+fn dune() -> NewBook {
+	NewBook {
 		isbn: "9780441013593",
 		title: "Dune",
 		author: "Frank Herbert",
 		pages: 412,
-		finished: false,
 	}
 }
 
-fn solaris() -> Book {
-	Book {
+fn solaris() -> NewBook {
+	NewBook {
 		isbn: "9780156027601",
 		title: "Solaris",
 		author: "Stanisław Lem",
 		pages: 204,
-		finished: false,
 	}
 }
 
@@ -31,7 +29,7 @@ case "select reads rows into Book, firstAs one row" {
 	let unread <- api.GET("/unread") by Visitor
 	expect unread is Ok([Book { title: "Solaris", .. }, Book { title: "Dune", .. }])
 	let one <- api.GET("/books/:isbn", "9780441013593") by Visitor
-	expect one is Ok(Book { author: "Frank Herbert", .. })
+	expect one is Ok(Book { author: "Frank Herbert", finished: false, .. })
 	let none <- api.GET("/books/:isbn", "0000000000") by Visitor
 	expect none is NotFound
 }
@@ -43,8 +41,8 @@ case "a finished book leaves the unread list, and reads back as true" {
 	expect done is NoContent
 	let unread <- api.GET("/unread") by Visitor
 	expect unread is Ok([Book { title: "Dune", .. }])
-	let solaris <- api.GET("/books/:isbn", "9780156027601") by Visitor
-	expect solaris is Ok(Book { finished: true, .. })
+	let read <- api.GET("/books/:isbn", "9780156027601") by Visitor
+	expect read is Ok(Book { finished: true, .. })
 	let missing <- api.POST("/books/:isbn/finished", "0000000000") by Visitor
 	expect missing is NotFound
 }
@@ -56,25 +54,42 @@ case "a second book with the same ISBN is a conflict" {
 	expect again is Conflict(_)
 }
 
-// A case holds the same `Books` the handlers use, so it can write a row no
-// handler would: SQLite keeps the text 'n/a' in an INTEGER column.
-case "a stored value that disagrees with its field is a Decode error" {
-	let _ <- Books.run(
-		"INSERT INTO books (isbn, title, author, pages) VALUES ('x', 'Notes', 'Anon', 'n/a')",
+// A case holds the same `Books` the handlers use, so the cases below reach
+// under the service.
+case "the table's CHECKs refuse a row Book would refuse" {
+	let r <- Books.run(
+		"INSERT INTO books (isbn, title, author, pages) VALUES ('x', 'Notes', 'Anon', 0)",
 		[]
 	)
-	let r <- api.GET("/books/:isbn", "x") by Visitor
-	match r {
-		ServerError(m) => expect m.startsWith("a row did not fit: StructuralMismatch at $.pages"),
-		_ => expect false,
-	}
+	expect r is Err(Constraint(_))
 }
 
-case "a statement the database refuses is a Sql error" {
-	let _ <- Books.run("DROP TABLE books", [])
+// The migration's table can't hold a row `Book` refuses, so this case swaps in
+// a loose one, as if the schema had drifted from the record.
+case "a row that does not fit Book is a Decode error, logged and hidden" {
+	let _ <- Books.batch([
+		SqlStatement {
+			sql: "DROP TABLE books",
+			params: [],
+		},
+		SqlStatement {
+			sql: "CREATE TABLE books (isbn, title, author, pages, finished)",
+			params: [],
+		},
+		SqlStatement {
+			sql: "INSERT INTO books VALUES ('x', 'Notes', 'Anon', 10, 2)",
+			params: [],
+		},
+	])
+	let r <- api.GET("/books/:isbn", "x") by Visitor
+	expect r is ServerError("the reading list is unavailable")
+	expect Logger.error called once with msg.startsWith("a books row did not fit Book: StructuralMismatch at $.finished")
+}
+
+case "a statement the database refuses is a Sql error, logged and hidden" {
+	let dropped <- Books.run("DROP TABLE books", [])
+	expect dropped is Ok(_)
 	let r <- api.GET("/unread") by Visitor
-	match r {
-		ServerError(m) => expect m.startsWith("query failed: "),
-		_ => expect false,
-	}
+	expect r is ServerError("the reading list is unavailable")
+	expect Logger.error called once with msg.startsWith("books query failed: ")
 }
