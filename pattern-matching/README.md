@@ -46,9 +46,9 @@ and the five arms cover every `Int` with no `_`:
 match grams {
 	..0 => None,
 	1..100 => Some(85),
-	101..2000 => Some(320),
-	2001..20000 => Some(695),
-	20001.. => None,
+	101..2_000 => Some(320),
+	2_001..20_000 => Some(695),
+	20_001.. => None,
 }
 ```
 
@@ -58,7 +58,7 @@ looks inside a `Parcel` and its status at once, and mixes in a range:
 ```bynk
 Parcel { status: Returned(BadAddress), id, .. } => "correct the address on \(id)",
 Parcel { status: Returned(_), id, .. } => "restock \(id)",
-Parcel { status: InTransit(_, 0), grams: 20001.., .. } => "send a two-person crew",
+Parcel { status: InTransit(_, 0), grams: 20_001.., .. } => "send a two-person crew",
 ```
 
 Every record pattern ends with `..`, so adding a field to `Parcel` breaks none

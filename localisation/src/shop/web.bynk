@@ -5,12 +5,6 @@ uses shop.messages
 consumes bynk { Locale }
 
 ---
-How many items a basket can hold. The bound is checked at the boundary, so a
-negative count never reaches a plural template.
----
-type ItemCount = Int where InRange(0, 999)
-
----
 The query string of `GET /basket`, such as `?items=3`.
 ---
 type BasketQuery = {
@@ -22,14 +16,8 @@ service api from http {
 	The handler never parses `Accept-Language` itself. It asks `Locale`, and
 	on Cloudflare the platform negotiates the header against the locales
 	`shop.messages` declares, falling back to its reference locale.
-
-	`headers` is not read here. It is declared so that a `system` test can send
-	an `Accept-Language` header; `Locale` reads the same request on its own.
 	---
-	on GET("/basket") (
-		query: BasketQuery,
-		headers: RequestHeaders
-	) -> Effect[HttpResult[String]] by Visitor given Locale {
+	on GET("/basket") (query: BasketQuery) -> Effect[HttpResult[String]] by Visitor given Locale {
 		let tag <- Locale.current()
 		Ok(basketSummary(tag, query.items))
 	}

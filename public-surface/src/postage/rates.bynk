@@ -99,9 +99,7 @@ private const Large: Band = Band {
 private fn bandFor(weight: Grams) -> Band {
 	if weight <= Small.upToGrams {
 		Small
-	} else {
-		if weight <= Medium.upToGrams { Medium } else { Large }
-	}
+	} else if weight <= Medium.upToGrams { Medium } else { Large }
 }
 
 private fn surcharge(options: QuoteOptions) -> Int {

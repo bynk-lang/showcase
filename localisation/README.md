@@ -37,10 +37,12 @@ declares, so the handler holds no parsing code at all.
 
    Polish adds the `few` and `many` arms its grammar needs. `basketSummary`
    wraps `render` in the same commons. Both `bynk.locale` and the bundle export a `render`, so
-   keeping the call here means a context never `uses` both:
+   keeping the call here means a context never `uses` both. Its count is an
+   `ItemCount`, a refined `Int` declared in the same commons, so a negative count
+   can't reach a plural template:
 
    ```bynk
-   fn basketSummary(tag: LocaleTag, count: Int) -> String {
+   fn basketSummary(tag: LocaleTag, count: ItemCount) -> String {
    	render(tag, withWhole(message("basket.summary"), "n", count))
    }
    ```
@@ -53,8 +55,9 @@ declares, so the handler holds no parsing code at all.
    Ok(basketSummary(tag, query.items))
    ```
 
-   The `headers` parameter is unused. It's there only so the system tests below
-   can send an `Accept-Language` header.
+   The route declares no `headers` parameter. A `system` test can still send
+   an `Accept-Language` header, and `Locale` reads it from the request on its
+   own.
 
 3. **`tests/shop/messages.bynk`** tests the bundle with literal tags: the plural
    edges at 0, 1 and many in each language, and an undeclared `"de"` falling

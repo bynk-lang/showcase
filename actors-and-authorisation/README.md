@@ -92,7 +92,17 @@ curl -X PUT -H "Authorization: Bearer $(bynk token Author --sub ada)" \
 curl http://localhost:8787/authors/ada/bio
 ```
 
-`bynk token` can't add claims, so it can't mint a moderator token.
+A refinement actor's token carries the claims its predicate needs, so
+`bynk token Moderator` mints one with `moderator` set. Clear `ada`'s bio as a
+moderator:
+
+```sh
+curl -X DELETE -H "Authorization: Bearer $(bynk token Moderator --sub mo)" \
+  http://localhost:8787/authors/ada/bio
+```
+
+An `Author` token, which has no `moderator` claim, gets a `403` from the same
+route.
 
 ## Read next
 

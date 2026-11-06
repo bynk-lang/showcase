@@ -4,6 +4,12 @@ uses bynk.locale
 uses bynk.locale.types
 
 ---
+How many items a basket can hold. The bound is checked at the boundary, so a
+negative count never reaches a plural template.
+---
+type ItemCount = Int where InRange(0, 999)
+
+---
 The reference locale. Every other block must declare the same codes with the
 same placeholders, and `render` falls back to this block for a tag the
 bundle doesn't declare.
@@ -35,6 +41,6 @@ because both `bynk.locale` and this bundle export a `render`. A context that
 calls this function never has to `uses bynk.locale`, so it never meets the
 clash.
 ---
-fn basketSummary(tag: LocaleTag, count: Int) -> String {
+fn basketSummary(tag: LocaleTag, count: ItemCount) -> String {
 	render(tag, withWhole(message("basket.summary"), "n", count))
 }

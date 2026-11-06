@@ -7,8 +7,17 @@ suite uptime.monitor
 // on day 1 is 97200000. At this tier a call's `by` clause gives the caller, so
 // `by Operator("ops")` runs the route as a signed-in operator.
 
+--- An upstream answer with this status and an empty body.
+fn answer(status: Int) -> Response {
+	Response {
+		status: status,
+		headers: Map.empty(),
+		body: "",
+	}
+}
+
 case "a healthy answer is recorded and moves seenUp to the scheduled time" {
-	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "" })
+	stub Fetch.send(_) returns Ok(answer(200))
 	let _ <- api.POST("/targets", NewTarget {
 		name: "shop",
 		url: "https://shop.test",
@@ -45,7 +54,7 @@ case "with nothing to watch the probe sends nothing" {
 }
 
 case "a healthy probe keeps a target past the nightly sweep" {
-	stub Fetch.send(_) returns Ok(Response { status: 204, headers: Map.empty(), body: "" })
+	stub Fetch.send(_) returns Ok(answer(204))
 	let _ <- api.POST("/targets", NewTarget {
 		name: "shop",
 		url: "https://shop.test",
@@ -59,7 +68,7 @@ case "a healthy probe keeps a target past the nightly sweep" {
 }
 
 case "a 5xx is no sign of life, so the sweep retires the target" {
-	stub Fetch.send(_) returns Ok(Response { status: 503, headers: Map.empty(), body: "" })
+	stub Fetch.send(_) returns Ok(answer(503))
 	let _ <- api.POST("/targets", NewTarget {
 		name: "shop",
 		url: "https://shop.test",
@@ -105,7 +114,7 @@ case "a wrong URL is fixed by removing the target and adding it again" {
 
 case "a target that hangs times out while the others are still probed" {
 	stub Fetch.send(Request { method: Get, url: "https://api.test", contentType: None, authorization: None, headers: Map.empty(), body: None }) never
-	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "" })
+	stub Fetch.send(_) returns Ok(answer(200))
 	let _ <- api.POST("/targets", NewTarget {
 		name: "api",
 		url: "https://api.test",

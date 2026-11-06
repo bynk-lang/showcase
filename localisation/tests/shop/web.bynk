@@ -5,7 +5,7 @@ suite shop.web
 
 case "the handler renders in the locale it is given" {
 	stub Locale.current() returns "pl"
-	let r <- api.GET("/basket", BasketQuery { items: 3 }, RequestHeaders.empty()) by Visitor
+	let r <- api.GET("/basket", BasketQuery { items: 3 }) by Visitor
 	expect r == Ok("3 produkty w koszyku")
 	expect Locale.current called once
 }
