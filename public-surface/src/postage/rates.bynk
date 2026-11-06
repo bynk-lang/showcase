@@ -79,29 +79,27 @@ private type Band = {
 
 private const Small: Band = Band {
 	name: "small",
-	upToGrams: 1000,
+	upToGrams: 1_000,
 	pence: 395,
 }
 
 private const Medium: Band = Band {
 	name: "medium",
-	upToGrams: 5000,
+	upToGrams: 5_000,
 	pence: 695,
 }
 
 --- The last band takes every weight `Grams` admits, so its limit is that ceiling.
 private const Large: Band = Band {
 	name: "large",
-	upToGrams: 20000,
+	upToGrams: 20_000,
 	pence: 1295,
 }
 
 private fn bandFor(weight: Grams) -> Band {
 	if weight <= Small.upToGrams {
 		Small
-	} else {
-		if weight <= Medium.upToGrams { Medium } else { Large }
-	}
+	} else if weight <= Medium.upToGrams { Medium } else { Large }
 }
 
 private fn surcharge(options: QuoteOptions) -> Int {
