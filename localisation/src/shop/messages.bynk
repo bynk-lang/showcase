@@ -4,7 +4,7 @@ uses bynk.locale
 uses bynk.locale.types
 
 ---
-How many items a basket can hold. The bound is checked at the boundary, so a
+A count `basketSummary` can phrase: 0 to 999. Taking the refined type means a
 negative count never reaches a plural template.
 ---
 type ItemCount = Int where InRange(0, 999)

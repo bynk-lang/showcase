@@ -44,9 +44,18 @@ case "a stray hyphen is rejected too" {
 // Leave `Forecasts` unstubbed and the real `HttpForecasts` provider runs,
 // composed over the platform doubles. Stub those instead to test it offline.
 
+--- An upstream answer with this status and body.
+fn answer(status: Int, body: String) -> Response {
+	Response {
+		status: status,
+		headers: Map.empty(),
+		body: body,
+	}
+}
+
 case "the provider builds the URL from the configured base" {
 	stub Secrets.get("FORECAST_API_URL") returns Some("https://forecast.test")
-	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "{\"city\":\"new-york\",\"highC\":21,\"summary\":\"sunny\"}" })
+	stub Fetch.send(_) returns Ok(answer(200, "{\"city\":\"new-york\",\"highC\":21,\"summary\":\"sunny\"}"))
 	let r <- api.GET("/forecast/:city", "new-york") by Visitor
 	expect r == Ok("new-york: 21°C, sunny.")
 	expect Fetch.send called once with req.url == "https://forecast.test/today/new-york"
@@ -54,14 +63,14 @@ case "the provider builds the URL from the configured base" {
 
 case "the provider maps an upstream 404 to an unknown city" {
 	stub Secrets.get(_) returns Some("https://forecast.test")
-	stub Fetch.send(_) returns Ok(Response { status: 404, headers: Map.empty(), body: "" })
+	stub Fetch.send(_) returns Ok(answer(404, ""))
 	let r <- api.GET("/forecast/:city", "atlantis") by Visitor
 	expect r is NotFound
 }
 
 case "the provider treats an unreadable body as unavailable" {
 	stub Secrets.get(_) returns Some("https://forecast.test")
-	stub Fetch.send(_) returns Ok(Response { status: 200, headers: Map.empty(), body: "not json" })
+	stub Fetch.send(_) returns Ok(answer(200, "not json"))
 	let r <- api.GET("/forecast/:city", "london") by Visitor
 	expect r is ServiceUnavailable(_)
 	expect Logger.warn called once

@@ -101,8 +101,13 @@ curl -X DELETE -H "Authorization: Bearer $(bynk token Moderator --sub mo)" \
   http://localhost:8787/authors/ada/bio
 ```
 
-An `Author` token, which has no `moderator` claim, gets a `403` from the same
-route.
+An `Author` token has no `moderator` claim, so the same call with one is
+refused with a `403`:
+
+```sh
+curl -i -X DELETE -H "Authorization: Bearer $(bynk token Author --sub ada)" \
+  http://localhost:8787/authors/ada/bio
+```
 
 ## Read next
 

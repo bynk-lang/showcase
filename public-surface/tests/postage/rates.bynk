@@ -5,7 +5,7 @@ and fees are tested directly, not only through the public functions.
 suite postage.rates {
 	case "the plain operation is the options form with every default" {
 		expect quote(750) == quoteWith(750, QuoteOptions {})
-		expect quote(12000) == quoteWith(12000, QuoteOptions {})
+		expect quote(12_000) == quoteWith(12_000, QuoteOptions {})
 	}
 
 	case "each option adds its own fee" {
@@ -16,11 +16,11 @@ suite postage.rates {
 
 	case "a band's upper weight belongs to that band" {
 		expect bandFor(1).name == "small"
-		expect bandFor(1000).name == "small"
-		expect bandFor(1001).name == "medium"
-		expect bandFor(5000).name == "medium"
-		expect bandFor(5001).name == "large"
-		expect bandFor(20000).name == "large"
+		expect bandFor(1_000).name == "small"
+		expect bandFor(1_001).name == "medium"
+		expect bandFor(5_000).name == "medium"
+		expect bandFor(5_001).name == "large"
+		expect bandFor(20_000).name == "large"
 	}
 
 	case "the private surcharge adds the private fees" {
@@ -29,7 +29,7 @@ suite postage.rates {
 	}
 
 	case "describe names the band" {
-		expect describe(3000) == "medium parcel, up to 5000 g"
+		expect describe(3_000) == "medium parcel, up to 5000 g"
 	}
 
 	case "a weight outside the range is refused" {

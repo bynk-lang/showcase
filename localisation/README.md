@@ -55,9 +55,11 @@ declares, so the handler holds no parsing code at all.
    Ok(basketSummary(tag, query.items))
    ```
 
-   The route declares no `headers` parameter. A `system` test can still send
-   an `Accept-Language` header, and `Locale` reads it from the request on its
-   own.
+   The route declares no `headers` parameter. A `system`-tier call may still
+   carry request headers the route doesn't declare, so the system tests below
+   pass `RequestHeaders` as an extra argument to send `Accept-Language`, and
+   `Locale` reads it from the request on its own. The unit test has no such
+   argument: below `system` a route sees only the parameters it declares.
 
 3. **`tests/shop/messages.bynk`** tests the bundle with literal tags: the plural
    edges at 0, 1 and many in each language, and an undeclared `"de"` falling
