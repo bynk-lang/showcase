@@ -1,0 +1,80 @@
+suite shelf.library
+
+fn dune() -> Book {
+	Book {
+		isbn: "9780441013593",
+		title: "Dune",
+		author: "Frank Herbert",
+		pages: 412,
+		finished: false,
+	}
+}
+
+fn solaris() -> Book {
+	Book {
+		isbn: "9780156027601",
+		title: "Solaris",
+		author: "Stanisław Lem",
+		pages: 204,
+		finished: false,
+	}
+}
+
+case "a fresh database already has the migrated schema" {
+	let unread <- api.GET("/unread") by Visitor
+	expect unread is Ok([])
+}
+
+case "select reads rows into Book, firstAs one row" {
+	let _ <- api.POST("/books", dune()) by Visitor
+	let _ <- api.POST("/books", solaris()) by Visitor
+	let unread <- api.GET("/unread") by Visitor
+	expect unread is Ok([Book { title: "Solaris", .. }, Book { title: "Dune", .. }])
+	let one <- api.GET("/books/:isbn", "9780441013593") by Visitor
+	expect one is Ok(Book { author: "Frank Herbert", .. })
+	let none <- api.GET("/books/:isbn", "0000000000") by Visitor
+	expect none is NotFound
+}
+
+case "a finished book leaves the unread list, and reads back as true" {
+	let _ <- api.POST("/books", dune()) by Visitor
+	let _ <- api.POST("/books", solaris()) by Visitor
+	let done <- api.POST("/books/:isbn/finished", "9780156027601") by Visitor
+	expect done is NoContent
+	let unread <- api.GET("/unread") by Visitor
+	expect unread is Ok([Book { title: "Dune", .. }])
+	let solaris <- api.GET("/books/:isbn", "9780156027601") by Visitor
+	expect solaris is Ok(Book { finished: true, .. })
+	let missing <- api.POST("/books/:isbn/finished", "0000000000") by Visitor
+	expect missing is NotFound
+}
+
+case "a second book with the same ISBN is a conflict" {
+	let first <- api.POST("/books", dune()) by Visitor
+	expect first is Created(_)
+	let again <- api.POST("/books", dune()) by Visitor
+	expect again is Conflict(_)
+}
+
+// A case holds the same `Books` the handlers use, so it can write a row no
+// handler would: SQLite keeps the text 'n/a' in an INTEGER column.
+case "a stored value that disagrees with its field is a Decode error" {
+	let _ <- Books.run(
+		"INSERT INTO books (isbn, title, author, pages) VALUES ('x', 'Notes', 'Anon', 'n/a')",
+		[]
+	)
+	let r <- api.GET("/books/:isbn", "x") by Visitor
+	match r {
+		ServerError(m) => expect m.startsWith("a row did not fit: StructuralMismatch at $.pages"),
+		_ => expect false,
+	}
+}
+
+case "a statement the database refuses is a Sql error" {
+	let _ <- Books.run("DROP TABLE books", [])
+	let r <- api.GET("/unread") by Visitor
+	match r {
+		ServerError(m) => expect m.startsWith("query failed: "),
+		_ => expect false,
+	}
+}

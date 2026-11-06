@@ -1,0 +1,89 @@
+context shelf.library
+
+uses shelf.books
+consumes bynk
+consumes bynk.cloudflare { D1 }
+
+---
+The reading list's database. It binds as `env.D1_BOOKS` and is named
+`shelf-library-books`, the name its `migrations/` directory carries.
+---
+capability Books = D1
+
+service api from http {
+	--- Add a book. A second book with the same ISBN breaks the primary key, which is a `Conflict`.
+	on POST("/books") (body: Book) -> Effect[HttpResult[Book]] by Visitor given Books {
+		let added <- Books.run(
+			"""sql
+			INSERT INTO books (isbn, title, author, pages, finished)
+			VALUES (?1, ?2, ?3, ?4, ?5)
+			""",
+			[
+				Text(body.isbn),
+				Text(body.title),
+				Text(body.author),
+				Integer(body.pages),
+				Boolean(body.finished),
+			]
+		)
+		match added {
+			Ok(_) => Created(body),
+			Err(Constraint(_)) => Conflict("that ISBN is already on the shelf"),
+			Err(e) => ServerError(sqlReason(e)),
+		}
+	}
+
+	--- One book, or `NotFound`.
+	on GET("/books/:isbn") (isbn: Isbn) -> Effect[HttpResult[Book]] by Visitor given Books {
+		let found <- Books.firstAs[Book]("FROM books WHERE isbn = ?1", [Text(isbn)])
+		match found {
+			Ok(Some(book)) => Ok(book),
+			Ok(None) => NotFound,
+			Err(Sql(e)) => ServerError(sqlReason(e)),
+			Err(Decode(e)) => ServerError(rowReason(e)),
+		}
+	}
+
+	--- The books still to read, shortest first.
+	on GET("/unread") () -> Effect[HttpResult[List[Book]]] by Visitor given Books {
+		let rows <- Books.select[Book](
+			"""sql
+			FROM books
+			WHERE finished = 0
+			ORDER BY pages, title
+			""",
+			[]
+		)
+		match rows {
+			Ok(list) => Ok(list),
+			Err(Sql(e)) => ServerError(sqlReason(e)),
+			Err(Decode(e)) => ServerError(rowReason(e)),
+		}
+	}
+
+	--- Mark a book read. An `UPDATE` that changed no row means there was no such book.
+	on POST("/books/:isbn/finished") (isbn: Isbn) -> Effect[HttpResult[()]] by Visitor given Books {
+		let r <- Books.run("UPDATE books SET finished = 1 WHERE isbn = ?1", [Text(isbn)])
+		match r {
+			Ok(run) => if run.changes == 0 { NotFound } else { NoContent },
+			Err(e) => ServerError(sqlReason(e)),
+		}
+	}
+}
+
+---
+A row that did not fit `Book`. In `Err(Decode(e))`, `e` is a `JsonError`, so its
+fields say which column was wrong and why.
+---
+fn rowReason(e: JsonError) -> String {
+	"a row did not fit: \(e.kind) at \(e.path): \(e.message)"
+}
+
+--- `SqlError` is extensible, so the match keeps a wildcard.
+fn sqlReason(e: SqlError) -> String {
+	match e {
+		Constraint(message) => "constraint: \(message)",
+		Failed(message) => "query failed: \(message)",
+		_ => "query failed",
+	}
+}

@@ -1,0 +1,23 @@
+commons shelf.books
+
+--- A book's ISBN, the table's primary key.
+type Isbn = String where NonEmpty
+
+type Title = String where NonEmpty
+
+--- A page count. Positive, so a zero-page book is refused at the boundary.
+type Pages = Int where Positive
+
+---
+One row of the `books` table. `select[Book]` writes the column list from these
+fields, in this order, so each field is named exactly like its column.
+`finished` is a SQLite `INTEGER` holding `0` or `1`, which a typed read takes as
+a `Bool`.
+---
+type Book = {
+	isbn: Isbn,
+	title: Title,
+	author: String,
+	pages: Pages,
+	finished: Bool,
+}
