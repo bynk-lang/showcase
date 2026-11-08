@@ -37,7 +37,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 version in [`BYNK_VERSION`](BYNK_VERSION). Then, from a project's directory:
 
 ```sh
-bynkc test .      # run its tests
+bynk test .      # run its tests
 bynk dev          # serve it locally, if it has an HTTP context
 ```
 
@@ -45,10 +45,10 @@ bynk dev          # serve it locally, if it has an HTTP context
 
 CI holds every project to the same bar:
 
-- **Canonical formatting.** `bynkc fmt --check` passes, so the formatter's
+- **Canonical formatting.** `bynk fmt --check` passes, so the formatter's
   output is the house style.
-- **It type-checks.** `bynkc check` is clean.
-- **The feature is tested.** `bynkc test` exercises the feature the project
+- **It type-checks.** `bynk check` is clean.
+- **The feature is tested.** `bynk test` exercises the feature the project
   is about, not just the code around it.
 - **It's small.** A project shows one idea. If a project needs a second idea,
   that idea gets its own project.

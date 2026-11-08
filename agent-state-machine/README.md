@@ -84,7 +84,7 @@ written, and the caller sees a 500.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev        # serves the ticket API on http://localhost:8787
 ```
 

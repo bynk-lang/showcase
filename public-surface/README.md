@@ -30,7 +30,7 @@ option is one more defaulted field, and every existing literal still compiles.
 ## Walkthrough
 
 **`src/postage/rates.bynk`** is the library. Its module doc says what the
-surface is, and carries a `bynk test` example that `bynkc test` runs. The
+surface is, and carries a `bynk test` example that `bynk test` runs. The
 options record defaults every field:
 
 ```bynk
@@ -93,7 +93,7 @@ second from adding `fn band(weight: Grams) -> Band` to the library.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev        # then:
 curl -X POST localhost:8787/quotes \
   -d '{"weight": 4200, "options": {"speed": {"kind": "Express"}}}'

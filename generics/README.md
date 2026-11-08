@@ -87,7 +87,7 @@ and a map lookup by a `Team` built anew finds the same key.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 ## Read next

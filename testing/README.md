@@ -17,7 +17,7 @@ predicate an `invariant` does, so there's no assertion library to learn.
 
 Isolation comes from capabilities. A unit asks for `Clock` and `Kv` with
 `given`, so a test double is just another provider at that seam. Under
-`bynkc test` every platform capability gets one: the clock reads the epoch, `Kv`
+`bynk test` every platform capability gets one: the clock reads the epoch, `Kv`
 is an in-memory store, and each case starts fresh. When a case needs a
 different answer, `stub` overrides one operation and leaves the rest alone.
 The right-hand side is a value or `fails`, never a block, so a double can't
@@ -72,7 +72,7 @@ grow logic of its own.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 To try the service by hand, run `bynk dev` and, in another terminal:

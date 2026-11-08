@@ -2,7 +2,7 @@
 The box-office desk: an HTTP service that places holds and looks them up.
 
 It reads the time from `Clock` and keeps holds in `Kv`, both platform
-capabilities. Under `bynkc test` each one is a deterministic double, which is
+capabilities. Under `bynk test` each one is a deterministic double, which is
 what lets the suite in `tests/holds/desk.bynk` test expiry without waiting.
 ---
 context holds.desk

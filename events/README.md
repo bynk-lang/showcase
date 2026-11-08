@@ -89,7 +89,7 @@ checkout.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 ## Read next

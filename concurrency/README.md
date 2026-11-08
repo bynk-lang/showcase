@@ -75,7 +75,7 @@ safe to do twice, and read `Err(TimedOut)` as "I didn't wait to find out", not
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 ## Read next

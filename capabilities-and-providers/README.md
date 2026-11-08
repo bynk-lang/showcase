@@ -71,7 +71,7 @@ visible and swappable:
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 To serve it locally, point the provider at a forecast API: any server that

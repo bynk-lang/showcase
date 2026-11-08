@@ -89,7 +89,7 @@ with `bynk.crypto` yourself. It is experimental, so `bynk.toml` opts in with
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 To serve it locally, give it both secrets:
@@ -118,5 +118,5 @@ after signing and it answers `401`.
 - [Share a handler step](https://bynk-lang.org/book/guides/effects-and-capabilities/share-a-handler-step/), for `given` on a context function
 - [Actors reference](https://bynk-lang.org/book/reference/actors/)
 - [Testing reference: the failure principals](https://bynk-lang.org/book/reference/testing/#failure-principals)
-- [`bynk.crypto` reference](https://bynk-lang.org/book/reference/bynk-capabilities/#cryptography--bynkcrypto)
+- [`bynk.crypto` reference](https://bynk-lang.org/book/reference/bynk-capabilities/#cryptography--bynkrypto)
 - Sibling projects: [`actors-and-authorisation`](../actors-and-authorisation/) covers the other kinds of actor. [`testing`](../testing/) goes deeper into tiers and stubs.
