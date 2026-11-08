@@ -1,0 +1,34 @@
+suite search.api {
+	case "a token is refused after its third search" {
+		let a <- api.GET("/search/:token", "ann") by Visitor
+		let b <- api.GET("/search/:token", "ann") by Visitor
+		let c <- api.GET("/search/:token", "ann") by Visitor
+		let d <- api.GET("/search/:token", "ann") by Visitor
+		expect a is Ok(_)
+		expect c is Ok(_)
+		expect d is TooManyRequests(_)
+	}
+
+	case "each token has its own count" {
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		let ben <- api.GET("/search/:token", "ben") by Visitor
+		expect ben is Ok(_)
+	}
+
+	case "the window reopens" {
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		let _ <- api.GET("/search/:token", "ann") by Visitor
+		advance Clock by 10.seconds
+		let again <- api.GET("/search/:token", "ann") by Visitor
+		expect again is Ok(_)
+	}
+
+	case "a stubbed limiter refuses without counting" {
+		stub SearchLimit.allow(_) returns false
+		let r <- api.GET("/search/:token", "zed") by Visitor
+		expect r is TooManyRequests(_)
+	}
+}

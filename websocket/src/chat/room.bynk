@@ -1,0 +1,58 @@
+---
+A chat room over WebSocket. The gateway authenticates the upgrade at the edge and hands each connection to the `Room` agent, which broadcasts every message to the room.
+---
+context chat.room
+
+type RoomId = opaque String
+
+type UserId = opaque String
+
+type ServerFrame = {
+	text: String,
+}
+
+type ClientFrame = {
+	text: String,
+}
+
+--- A signed-in participant. The upgrade is refused unless it carries a valid bearer token.
+actor Participant { auth = Bearer(secret = "AUTH_SECRET"), identity = UserId }
+
+service ChatGateway from websocket(in: ClientFrame, out: ServerFrame) {
+	on open(roomId: RoomId) -> Effect[()] by user: Participant {
+		let _ <- connection.send(ServerFrame { text: "welcome" })
+		let _ <- Room(roomId).join(user.identity, connection)
+	}
+
+	on message(roomId: RoomId, frame: ClientFrame) -> Effect[()] by user: Participant {
+		let _ <- Room(roomId).post(user.identity, frame.text)
+	}
+
+	on close(roomId: RoomId) -> Effect[()] by user: Participant {
+		let _ <- Room(roomId).leave(user.identity)
+	}
+}
+
+--- One room. It owns the connections of everyone in it.
+agent Room {
+	key id: RoomId
+
+	store members: Set[UserId]
+	store conns: Map[UserId, Connection[ServerFrame]]
+
+	on call join(u: UserId, conn: Connection[ServerFrame]) -> Effect[()] {
+		let _ <- members.add(u)
+		let _ <- conns.put(u, conn)
+	}
+
+	on call leave(u: UserId) -> Effect[()] {
+		let _ <- members.remove(u)
+		let _ <- conns.remove(u)
+	}
+
+	on call post(sender: UserId, text: String) -> Effect[()] {
+		let _ <- conns.parTraverse((c: Connection[ServerFrame]) => c.send(ServerFrame {
+			text: text,
+		}))
+	}
+}

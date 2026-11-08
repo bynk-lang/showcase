@@ -1,0 +1,10 @@
+context app.web
+
+uses app.page
+
+service web from http {
+	--- Serve the home page as HTML.
+	on GET("/") () -> Effect[HttpResult[()]] by Visitor {
+		Raw(Bytes.fromUtf8(render("Home", "<p>Hello</p>")), "text/html; charset=utf-8")
+	}
+}

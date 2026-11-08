@@ -1,0 +1,49 @@
+commons shop.pricing
+
+--- A unit price: strictly positive.
+type Price = Decimal where Positive
+
+--- A tax rate as a fraction, so 20% is `0.20d`.
+type Rate = Decimal where InRange(0.00d, 1.00d)
+
+---
+Unit price times quantity. `*` is exact and never rounds.
+---
+fn lineTotal(unit: Price, qty: Int) -> Decimal {
+	unit * Decimal.fromInt(qty)
+}
+
+---
+Add tax, then round to cents. Rounding happens only here, where it is written.
+---
+fn withTax(net: Decimal, rate: Rate) -> Decimal {
+	(net + net * rate).round(2, RoundingMode.HalfEven)
+}
+
+---
+One equal share, rounded down to the cent. `/` is not defined on `Decimal`:
+`div` states the scale and the rounding mode.
+---
+fn baseShare(total: Decimal, ways: Int) -> Decimal {
+	total.div(Decimal.fromInt(ways), 2, RoundingMode.Down)
+}
+
+---
+The cents `baseShare` dropped, as a whole number of cents. Exact, so it can be
+handed out.
+---
+fn leftoverCents(total: Decimal, ways: Int) -> Int {
+	((total - baseShare(total, ways) * Decimal.fromInt(ways)) * 100.00d).toInt().getOrElse(0)
+}
+
+---
+Share number `i` (from 0): the base share, plus one cent for the first
+`leftoverCents` shares. The shares always add up to `total`.
+---
+fn shareAt(total: Decimal, ways: Int, i: Int) -> Decimal {
+	if i < leftoverCents(total, ways) {
+		baseShare(total, ways) + 0.01d
+	} else {
+		baseShare(total, ways)
+	}
+}

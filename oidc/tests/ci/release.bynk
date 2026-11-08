@@ -1,0 +1,24 @@
+// The token's signature, `iss`, `aud` and `exp` are checked by the auth seam,
+// which only exists at `system`; there the driver holds no key pair for the
+// provider's JWKS, so a case can't send a token. Here the handler runs in
+// process and a case supplies the claims a verified token would carry.
+suite ci.release {
+	case "a release from the trusted repository" {
+		let r <- release.POST(
+			"/release"
+		) by Workload("wid", TokenClaims.of(["repository: acme/money"]))
+		expect r == Ok("released by wid")
+	}
+
+	case "a job from another repository is forbidden" {
+		let r <- release.POST(
+			"/release"
+		) by Workload("wid", TokenClaims.of(["repository: evil/fork"]))
+		expect r is Forbidden
+	}
+
+	case "a token with no repository claim is forbidden" {
+		let r <- release.POST("/release") by Workload("wid")
+		expect r is Forbidden
+	}
+}

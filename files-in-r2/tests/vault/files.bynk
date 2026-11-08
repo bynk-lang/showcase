@@ -1,0 +1,30 @@
+suite vault.files
+
+case "a stored file reads back byte for byte" {
+	let put <- api.PUT("/files/:key", "notes/a.txt", Bytes.fromUtf8("hello")) by Visitor
+	expect put is Created(5)
+	let got <- api.GET("/files/:key", "notes/a.txt") by Visitor
+	expect got == Raw(Bytes.fromUtf8("hello"), "application/octet-stream")
+}
+
+case "a missing file is NotFound" {
+	let got <- api.GET("/files/:key", "nope") by Visitor
+	expect got is NotFound
+}
+
+case "a second upload to the same key is refused and keeps the first" {
+	let first <- api.PUT("/files/:key", "a", Bytes.fromUtf8("one")) by Visitor
+	expect first is Created(3)
+	let again <- api.PUT("/files/:key", "a", Bytes.fromUtf8("three!")) by Visitor
+	expect again is Conflict(_)
+	let size <- Archives.head("a")
+	expect size.map((o) => o.size) == Some(3)
+}
+
+case "listing a prefix returns only its keys" {
+	let _ <- api.PUT("/files/:key", "p/1", Bytes.fromUtf8("x")) by Visitor
+	let _ <- api.PUT("/files/:key", "p/2", Bytes.fromUtf8("y")) by Visitor
+	let _ <- api.PUT("/files/:key", "q/1", Bytes.fromUtf8("z")) by Visitor
+	let keys <- api.GET("/folders/:prefix", "p/") by Visitor
+	expect keys is Ok(["p/1", "p/2"])
+}

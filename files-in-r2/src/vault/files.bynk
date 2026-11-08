@@ -1,0 +1,48 @@
+context vault.files
+
+consumes bynk.cloudflare
+consumes bynk.cloudflare { R2 }
+
+---
+The bucket. It binds as `env.R2_ARCHIVES`, and `bynk deploy` creates it as
+`<worker>-archives`.
+---
+capability Archives = R2
+
+service api from http {
+	---
+	Store a file, once. `Absent` creates only, so a second upload to the same key
+	writes nothing and is a `Conflict`.
+	---
+	on PUT("/files/:key") (
+		key: String,
+		body: Bytes
+	) -> Effect[HttpResult[Int]] by Visitor given Archives {
+		let stored <- Archives.putWith(key, body, R2Put {
+			contentType: Some("application/octet-stream"),
+			metadata: Map.empty(),
+			onlyIf: Absent,
+		})
+		match stored {
+			Some(o) => Created(o.size),
+			None => Conflict("that file already exists"),
+		}
+	}
+
+	--- Fetch a file's bytes, or `NotFound`.
+	on GET("/files/:key") (key: String) -> Effect[HttpResult[()]] by Visitor given Archives {
+		let found <- Archives.get(key)
+		match found {
+			Some(body) => Raw(body, "application/octet-stream"),
+			None => NotFound,
+		}
+	}
+
+	--- The keys under a prefix, in key order.
+	on GET("/folders/:prefix") (
+		prefix: String
+	) -> Effect[HttpResult[List[String]]] by Visitor given Archives {
+		let page <- Archives.list(Some(prefix), None)
+		Ok(page.keys.map((o) => o.key))
+	}
+}

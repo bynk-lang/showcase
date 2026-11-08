@@ -1,0 +1,25 @@
+context search.api
+
+consumes bynk.cloudflare { RateLimit }
+
+---
+Searches per token: three in each ten seconds. The count is approximate (it is
+kept per Cloudflare location), which suits abuse control, not an exact quota.
+---
+capability SearchLimit = RateLimit @limit(3) @period(10.seconds)
+
+service api from http {
+	---
+	Answer a search, or refuse with `429` once `token` is over its limit.
+	---
+	on GET("/search/:token") (
+		token: String
+	) -> Effect[HttpResult[String]] by Visitor given SearchLimit {
+		let allowed <- SearchLimit.allow(token)
+		if allowed {
+			Ok("results")
+		} else {
+			TooManyRequests("slow down: 3 searches per 10 seconds")
+		}
+	}
+}
