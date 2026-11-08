@@ -1,0 +1,22 @@
+commons app.page
+
+asset style = "assets/page.css"
+
+embed shell = "embeds/page.html"
+
+---
+Escapes text for an HTML body or a double-quoted attribute.
+---
+fn escape(s: String) -> String {
+	s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+}
+
+---
+Fills the shell. `content` is markup the caller built and escaped.
+---
+fn render(title: String, content: String) -> String {
+	shell
+		.replace("{{style}}", style.url)
+		.replace("{{title}}", escape(title))
+		.replace("{{content}}", content)
+}

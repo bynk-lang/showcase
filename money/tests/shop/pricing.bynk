@@ -1,0 +1,38 @@
+suite shop.pricing {
+	case "decimal addition is exact" {
+		expect 0.1d + 0.2d == 0.3d
+		expect 1.10d + 2.20d == 3.30d
+	}
+
+	case "a line total multiplies exactly" {
+		let unit = Price.of(4.50d)?
+		expect lineTotal(unit, 3) == 13.50d
+	}
+
+	case "price and rate are refined" {
+		expect Price.of(0.00d) is Err(_)
+		expect Price.of(0.01d) is Ok(_)
+		expect Rate.of(1.01d) is Err(_)
+		expect Rate.of(0.20d) is Ok(_)
+	}
+
+	case "tax rounds half-even to cents" {
+		let rate = Rate.of(0.20d)?
+		expect withTax(10.00d, rate) == 12.00d
+		expect withTax(0.05d, Rate.of(0.50d)?) == 0.08d
+	}
+
+	case "ten split three ways keeps every cent" {
+		expect baseShare(10.00d, 3) == 3.33d
+		expect leftoverCents(10.00d, 3) == 1
+		expect shareAt(10.00d, 3, 0) == 3.34d
+		expect shareAt(10.00d, 3, 1) == 3.33d
+		let sum = shareAt(10.00d, 3, 0) + shareAt(10.00d, 3, 1) + shareAt(10.00d, 3, 2)
+		expect sum == 10.00d
+	}
+
+	case "an even split has no leftover" {
+		expect leftoverCents(9.00d, 3) == 0
+		expect shareAt(9.00d, 3, 2) == 3.00d
+	}
+}

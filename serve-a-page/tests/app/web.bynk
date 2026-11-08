@@ -1,0 +1,23 @@
+suite app.web {
+	case "the shell has its placeholders" {
+		expect shell.contains("{{title}}")
+		expect shell.contains("{{content}}")
+	}
+
+	case "the page fills every placeholder" {
+		let page = render("Home", "<p>Hello</p>")
+		expect page.contains("<title>Home</title>")
+		expect page.contains("<p>Hello</p>")
+		expect page.contains("{{") == false
+	}
+
+	case "the title is escaped" {
+		let page = render("<b>&", "")
+		expect page.contains("<title>&lt;b&gt;&amp;</title>")
+	}
+
+	case "GET / serves an HTML page" {
+		let r <- web.GET("/") by Visitor
+		expect r is Raw(_, _)
+	}
+}

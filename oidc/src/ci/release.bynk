@@ -1,0 +1,31 @@
+context ci.release
+
+--- A CI workload's id, minted from the verified token's `sub` claim.
+type WorkloadId = String where NonEmpty
+
+---
+A CI job, authenticated by an OIDC token from the provider. The actor names
+only public trust parameters, so there is no secret to store or leak. A missing,
+forged or expired token is a `401` before any handler runs.
+---
+actor Workload {
+	auth = Oidc(
+		issuer = "https://token.actions.example.com",
+		audience = "release-api",
+		jwks = "https://token.actions.example.com/.well-known/jwks"
+	),
+	identity = WorkloadId
+}
+
+---
+Publish a release. The token proves the caller is a CI job; whether that job
+belongs to the trusted repository is a claim, checked here in the body.
+---
+service release from http {
+	on POST("/release") () -> Effect[HttpResult[String]] by w: Workload {
+		match w.claims.get("repository") {
+			Some("acme/money") => Ok("released by \(w.identity)"),
+			_ => Forbidden,
+		}
+	}
+}

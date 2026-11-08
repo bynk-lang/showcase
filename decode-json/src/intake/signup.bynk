@@ -1,0 +1,47 @@
+commons intake.signup
+
+--- A non-empty display name.
+type Name = String where NonEmpty
+
+--- Whole years, in a believable range.
+type Age = Int where InRange(13, 120)
+
+---
+A sign-up form as it arrives from outside.
+
+`note` is optional: the JSON may omit it, set it to `null`, or give a bare value.
+---
+type Signup = {
+	name: Name,
+	age: Age,
+	note: Option[String],
+}
+
+---
+Decode untrusted text. The shape and the refinements are checked together, so an
+`Ok` carries a `Signup` that is already valid.
+---
+fn parse(raw: String) -> Result[Signup, JsonError] {
+	Json.decode[Signup](raw)
+}
+
+--- Why a decode failed, built from the error's three string fields.
+fn describe(raw: String) -> String {
+	match Json.decode[Signup](raw) {
+		Ok(s) => "welcome \(s.name)",
+		Err(e) => "\(e.kind) at \(e.path): \(e.message)",
+	}
+}
+
+--- The error's kind alone.
+fn kindOf(raw: String) -> String {
+	match Json.decode[Signup](raw) {
+		Ok(_) => "ok",
+		Err(e) => e.kind,
+	}
+}
+
+--- Write a signup for a non-Bynk API: `None` becomes `null`.
+fn render(s: Signup) -> String {
+	Json.encodePlain(s)
+}

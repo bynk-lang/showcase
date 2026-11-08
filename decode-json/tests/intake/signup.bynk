@@ -1,0 +1,46 @@
+suite intake.signup {
+	case "a well-formed payload decodes" {
+		expect parse("{\"name\": \"Ada\", \"age\": 36}") is Ok(_)
+	}
+
+	case "an optional field may be absent, null or bare" {
+		let absent = parse("{\"name\": \"Ada\", \"age\": 36}")
+		let nul = parse("{\"name\": \"Ada\", \"age\": 36, \"note\": null}")
+		let bare = parse("{\"name\": \"Ada\", \"age\": 36, \"note\": \"hi\"}")
+		expect absent is Ok(_)
+		expect nul is Ok(_)
+		expect bare is Ok(_)
+	}
+
+	case "malformed JSON is Malformed" {
+		expect kindOf("{not json") == "Malformed"
+	}
+
+	case "a wrong base type is a structural mismatch" {
+		expect kindOf("{\"name\": \"Ada\", \"age\": \"old\"}") == "StructuralMismatch"
+		expect kindOf("{\"age\": 36}") == "StructuralMismatch"
+	}
+
+	case "a refinement is enforced during decode" {
+		expect kindOf("{\"name\": \"\", \"age\": 36}") == "RefinementViolation"
+		expect kindOf("{\"name\": \"Ada\", \"age\": 5}") == "RefinementViolation"
+	}
+
+	case "the error says where" {
+		expect describe("{\"name\": \"Ada\", \"age\": 5}").contains("$.age")
+	}
+
+	case "a valid payload is described by name" {
+		expect describe("{\"name\": \"Ada\", \"age\": 36}") == "welcome Ada"
+	}
+
+	case "encodePlain writes None as null and decodes back" {
+		let s = Signup {
+			name: "Ada",
+			age: 36,
+			note: None,
+		}
+		expect render(s) == "{\"name\":\"Ada\",\"age\":36,\"note\":null}"
+		expect parse(render(s)) is Ok(_)
+	}
+}
