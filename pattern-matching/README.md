@@ -80,7 +80,7 @@ parcels that fall through to `_`.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 ## Read next

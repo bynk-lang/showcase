@@ -77,7 +77,7 @@ depends on it finishing.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev
 ```
 

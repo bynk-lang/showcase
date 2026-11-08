@@ -89,7 +89,7 @@ case "a quantity of zero is refused before the handler runs" {
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev        # then: curl -X POST localhost:8787/lines/TEA-0042
 ```
 

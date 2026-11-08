@@ -81,7 +81,7 @@ declares, so the handler holds no parsing code at all.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev
 curl -H "Accept-Language: fr-CA" "localhost:8787/basket?items=0"
 # "0 article dans votre panier"

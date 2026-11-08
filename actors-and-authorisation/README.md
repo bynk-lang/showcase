@@ -78,7 +78,7 @@ An author acting on the moderator route gets `Forbidden`, and a moderator gets
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev -- --var AUTH_JWT_SECRET:dev-only-secret
 ```
 

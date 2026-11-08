@@ -114,7 +114,7 @@ both, the caller sees only the plain message.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev
 ```
 

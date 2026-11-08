@@ -108,7 +108,7 @@ cases read like real runs.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev
 ```
 

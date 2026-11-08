@@ -89,7 +89,7 @@ JSON to show that a negative price or count never gets past the boundary.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 bynk dev
 ```
 

@@ -72,7 +72,7 @@ whole order, and a loyalty discount that does not hide an error.
 ## Run it
 
 ```sh
-bynkc test .
+bynk test .
 ```
 
 ## Read next
