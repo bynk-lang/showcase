@@ -14,3 +14,20 @@ jobs:
   checks:
     name: Check
     uses: ./.github/workflows/checks.yml
+
+  # One required status check for the ruleset: the per-project checks are a
+  # matrix whose names change as projects come and go, so the ruleset
+  # requires this job instead of each of them.
+  ci-green:
+    name: CI green
+    needs: checks
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every project check passed
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: |
+          echo "Project checks: $RESULT"
+          [ "$RESULT" = success ]
