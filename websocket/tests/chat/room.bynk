@@ -1,0 +1,75 @@
+---
+The gateway, driven by its handlers. `ChatGateway.open(tc, room)` runs
+`on open` with a `TestConnection` standing in for the socket, and `tc.sent()`
+is every frame the server wrote to it. `message` and `close` take no route
+values or `by`: the connection remembers them from `open`, as the platform
+does.
+---
+suite chat.room
+
+fn said(text: String) -> ServerFrame {
+	ServerFrame { text: text }
+}
+
+case "a joiner is welcomed, then hears every post in the room" {
+	let alice = TestConnection[ServerFrame]()
+	let bob = TestConnection[ServerFrame]()
+	let room = RoomId.unsafe("lobby")
+	let _ <- ChatGateway.open(alice, room) by Participant(UserId.unsafe("alice"))
+	expect alice.sent() == [said("welcome")]
+	let _ <- ChatGateway.open(bob, room) by Participant(UserId.unsafe("bob"))
+	let _ <- ChatGateway.message(alice, ClientFrame { text: "hi" })
+	expect alice.sent() == [said("welcome"), said("hi")]
+	expect bob.sent() == [said("welcome"), said("hi")]
+}
+
+case "someone who has left hears nothing more" {
+	let alice = TestConnection[ServerFrame]()
+	let bob = TestConnection[ServerFrame]()
+	let room = RoomId.unsafe("lobby")
+	let _ <- ChatGateway.open(alice, room) by Participant(UserId.unsafe("alice"))
+	let _ <- ChatGateway.open(bob, room) by Participant(UserId.unsafe("bob"))
+	let _ <- ChatGateway.close(bob)
+	let _ <- ChatGateway.message(alice, ClientFrame { text: "anyone?" })
+	expect bob.sent() == [said("welcome")]
+	expect alice.sent() == [said("welcome"), said("anyone?")]
+}
+
+case "a post stays in its own room" {
+	let alice = TestConnection[ServerFrame]()
+	let carol = TestConnection[ServerFrame]()
+	let _ <- ChatGateway.open(alice, RoomId.unsafe("lobby")) by Participant(UserId.unsafe("alice"))
+	let _ <- ChatGateway.open(carol, RoomId.unsafe("garden")) by Participant(UserId.unsafe("carol"))
+	let _ <- ChatGateway.message(alice, ClientFrame { text: "hi" })
+	expect alice.sent() == [said("welcome"), said("hi")]
+	expect carol.sent() == [said("welcome")]
+}
+
+// The room on its own. `tc.connection()` hands over the owned `Connection` a
+// `join` takes, so a case can drive the agent without the gateway.
+case "the room broadcasts to every connection it holds" {
+	let ada = TestConnection[ServerFrame]()
+	let grace = TestConnection[ServerFrame]()
+	let room = Room(RoomId.unsafe("lab"))
+	let _ <- room.join(UserId.unsafe("ada"), ada.connection())
+	let _ <- room.join(UserId.unsafe("grace"), grace.connection())
+	let _ <- room.post(UserId.unsafe("ada"), "tea?")
+	expect ada.sent() == [said("tea?")]
+	expect grace.sent() == [said("tea?")]
+}
+
+// After `leave`, the room no longer holds the connection, so nothing more is
+// sent to it. On Workers `conns.remove` also closes it; `bynk test` builds the
+// bundle target, where `remove` doesn't yet close a held connection, so
+// `grace.closed()` can't be asserted here until
+// https://github.com/bynk-lang/bynk/issues/3224 is fixed.
+case "a member who leaves hears nothing more" {
+	let ada = TestConnection[ServerFrame]()
+	let grace = TestConnection[ServerFrame]()
+	let room = Room(RoomId.unsafe("lab"))
+	let _ <- room.join(UserId.unsafe("ada"), ada.connection())
+	let _ <- room.join(UserId.unsafe("grace"), grace.connection())
+	let _ <- room.leave(UserId.unsafe("grace"))
+	let _ <- room.post(UserId.unsafe("ada"), "tea?")
+	expect grace.sent() == []
+}

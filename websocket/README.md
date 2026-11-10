@@ -53,24 +53,35 @@ Everything lives in [`src/chat/room.bynk`](src/chat/room.bynk).
    }
    ```
 
+4. The tests. [`tests/chat/room.bynk`](tests/chat/room.bynk) drives the
+   gateway by its handlers against a `TestConnection`, which records every
+   frame the server sends. `message` and `close` take no route values and no
+   `by`: the connection remembers them from `open`, as the platform does.
+
+   ```bynk
+   let alice = TestConnection[ServerFrame]()
+   let _ <- ChatGateway.open(alice, room) by Participant(UserId.unsafe("alice"))
+   let _ <- ChatGateway.message(alice, ClientFrame { text: "hi" })
+   expect alice.sent() == [said("welcome"), said("hi")]
+   ```
+
+   `tc.connection()` hands over the owned `Connection` itself, so a case can
+   drive the `Room` agent without the gateway.
+
 ## Run it
 
 ```sh
-bynk check
+bynk test .
 ```
 
-This project has no `tests/` directory, on purpose. In 0.512.10 a
-`from websocket` service has no address in a `bynk test` case
-(`bynk.test.service_bad_address`), and a `Connection` can't be constructed in
-one, so the `Room` agent can't be reached either. The compiler's own checks do
-the work here: the held-connection discipline, the `by` requirement and the
-open-transfer shape are all enforced by `bynk check`. On the bundle target the
-generated handlers run against a `TestConnection`, as the book's guide shows,
-from a TypeScript harness.
+The WebSocket address works at the `unit` and `integration` tiers. A `system`
+case can't use it (`bynk.test.ws_needs_in_process`): a deployed WebSocket is a
+real upgrade through the Worker and a Durable Object.
 
 ## Read next
 
 - [Handle a WebSocket connection](https://bynk-lang.org/book/guides/entry-points/websocket/)
+- [Testing: driving a WebSocket service](https://bynk-lang.org/book/reference/testing/#websocket-address)
 - [WebSocket reference](https://bynk-lang.org/book/reference/websocket/), for
   the platform mapping and diagnostics
 - Showcase: [`actors-and-authorisation`](../actors-and-authorisation/) for
