@@ -1,0 +1,34 @@
+---
+The callee. `shop.orders` calls `authorise` across a Service Binding, and the
+two contexts deploy as separate Workers, so this contract changes while callers
+built against the old one are still live.
+---
+context shop.payment
+
+--- What a caller asks to be charged.
+type Charge = {
+	pence: Int,
+	// Added after callers were live. A required field added to a request is
+	// breaking: a caller compiled before it doesn't send it. With a default,
+	// the callee fills it in, so the change is compatible and this context
+	// can deploy ahead of its callers.
+	currency: String = "GBP",
+}
+
+--- The answer to a charge.
+type Authorisation = {
+	approved: Bool,
+	// Also added later, and it needs no default: a field added to a response
+	// is compatible when this context deploys first, since a caller compiled
+	// before it ignores it.
+	method: String,
+}
+
+service authorise {
+	on call(charge: Charge) -> Effect[Authorisation] {
+		Authorisation {
+			approved: charge.currency == "GBP" && charge.pence <= 10_000,
+			method: if charge.pence <= 1_000 { "wallet" } else { "card" },
+		}
+	}
+}
