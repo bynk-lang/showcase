@@ -62,7 +62,8 @@ Without it, a suite that tries a £10 basket and a £60 one passes against both
 `>=` and `>`, and `--mutate` reports `>=` → `>` as a survivor in `charge`. Add
 the case and the mutant is killed.
 
-CI holds this project to a score of 100%:
+CI holds this project to a score of 100%. The project opts in with
+[`.mutation-gate`](.mutation-gate), which holds the minimum score, and CI runs:
 
 ```sh
 bynk test --mutate --mutate-fail-under 100
@@ -88,7 +89,7 @@ Not every survivor is a gap. A change that makes no observable difference (an
 
 ```toml
 [test.mutate]
-exclude = ["shop.legacy"]
+exclude = ["src/shop/legacy/**", "shop.delivery.roundUp"]
 ```
 
 Often, though, an equivalent mutant points to code that can be put more plainly.
