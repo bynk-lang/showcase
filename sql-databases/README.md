@@ -27,7 +27,8 @@ Four rules keep the SQL safe and the rows typed:
   different number of `?N` than its list passes is `bynk.d1.sql_param_count`,
   and a `select[Book]` whose `Book` has a field with no column is
   `bynk.d1.select_field_missing`. They are compile errors, not a failing
-  request.
+  request. The check sees the migrations, not the live database, so a
+  database that has drifted from them still fails at run time, as below.
 - **The row is a record.** `select[Book]` and `firstAs[Book]` write
   `SELECT "isbn", "title", …` from `Book`'s fields, so you write the statement
   from `FROM` on and the column list is never spelt twice.
@@ -119,8 +120,9 @@ loose table holding a `finished` of `2`, and the read logs a `Decode` at
 `$.finished`. Its `CREATE TABLE IF NOT EXISTS` is a workaround: the schema
 check prepares the statements of a `batch` one by one against the migrated
 schema, where `books` still exists after the `DROP` before it
-([bynk-lang/bynk#3197](https://github.com/bynk-lang/bynk/issues/3197)). The last drops the table, and the read logs a `Sql` failure. In
-both, the caller sees only the plain message.
+([bynk-lang/bynk#3197](https://github.com/bynk-lang/bynk/issues/3197)). The
+last drops the table, and the read logs a `Sql` failure. In both, the caller
+sees only the plain message.
 
 ## Run it
 
