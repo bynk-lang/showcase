@@ -15,19 +15,39 @@ jobs:
     name: Check
     uses: ./.github/workflows/checks.yml
 
+  # The root is a workspace (bynk.toml), so `bynk check` there runs every
+  # project as a member. The per-project jobs never run at the root, so this
+  # is what catches a top-level directory that isn't a project, or a release
+  # that changes workspace behaviour.
+  workspace:
+    name: Workspace root
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: bynk-lang/setup-bynk@3ee807123be2578fd5d5be518fbc2b489aef6171 # v2.0.1
+        with:
+          version-file: BYNK_VERSION
+      - name: bynk check at the workspace root
+        run: bynk check .
+
   # One required status check for the ruleset: the per-project checks are a
   # matrix whose names change as projects come and go, so the ruleset
   # requires this job instead of each of them.
   ci-green:
     name: CI green
-    needs: checks
+    needs: [checks, workspace]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Every project check passed
+      - name: Every project check, and the workspace root, passed
         env:
           RESULT: ${{ needs.checks.result }}
+          WORKSPACE: ${{ needs.workspace.result }}
         run: |
           echo "Project checks: $RESULT"
-          [ "$RESULT" = success ]
+          echo "Workspace root: $WORKSPACE"
+          [ "$RESULT" = success ] && [ "$WORKSPACE" = success ]
