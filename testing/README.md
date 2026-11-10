@@ -65,8 +65,9 @@ grow logic of its own.
 
 4. [`tests/holds/desk.bynk`](tests/holds/desk.bynk): the context suite,
    driving `api.POST` and `api.GET`. Its cases look a hold up by reference, so
-   its helper pins `Val[HoldId]("H-0001")`. With no stub, a new hold is stamped at
-   the epoch, a hold reads back from the in-memory `Kv`, and the next case
+   its helper pins `Val[HoldId]("H-0042")`, a reference other than the
+   `@example`, so the pin is visibly deliberate. With no stub, a new hold is
+   stamped at the epoch, a hold reads back from the in-memory `Kv`, and the next case
    finds `Kv` empty again. To test expiry, a sequenced stub gives each call to
    `Clock.now()` its own answer, the first for placing the hold and the second
    for looking it up:
