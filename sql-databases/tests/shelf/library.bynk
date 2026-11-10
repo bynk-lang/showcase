@@ -65,7 +65,10 @@ case "the table's CHECKs refuse a row Book would refuse" {
 }
 
 // The migration's table can't hold a row `Book` refuses, so this case swaps in
-// a loose one, as if the schema had drifted from the record.
+// a loose one, as if the schema had drifted from the record. `bynk check`
+// prepares each statement against the migrated schema on its own, where
+// `books` still exists; `IF NOT EXISTS` lets the CREATE prepare there, and by
+// the time it runs the DROP has cleared the way.
 case "a row that does not fit Book is a Decode error, logged and hidden" {
 	let _ <- Books.batch([
 		SqlStatement {
@@ -73,7 +76,7 @@ case "a row that does not fit Book is a Decode error, logged and hidden" {
 			params: [],
 		},
 		SqlStatement {
-			sql: "CREATE TABLE books (isbn, title, author, pages, finished)",
+			sql: "CREATE TABLE IF NOT EXISTS books (isbn, title, author, pages, finished)",
 			params: [],
 		},
 		SqlStatement {
