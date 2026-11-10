@@ -12,13 +12,13 @@ fixture groupBooking = "fixtures/group-booking.json"
 fixture tooManySeats = "fixtures/too-many-seats.json"
 
 ---
-A hold placed at the epoch. Its seat count is irrelevant to every case that
-uses it, so `Val[Seats]` fabricates a valid one. A `HoldId` is refined by a
-pattern, which `Val` cannot invent, so it is pinned.
+A hold placed at the epoch. Its reference and seat count are irrelevant to
+every case that uses it, so `Val` fabricates both: a valid `Seats`, and the
+`@example` `HoldId` declares.
 ---
 fn placedAtEpoch() -> Hold {
 	Hold {
-		id: Val[HoldId]("H-0001"),
+		id: Val[HoldId],
 		seats: Val[Seats],
 		placedAt: Instant.fromEpochMillis(0),
 	}

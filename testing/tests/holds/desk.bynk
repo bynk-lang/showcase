@@ -8,7 +8,10 @@ case needs a different answer; every other operation keeps its double.
 ---
 suite holds.desk
 
---- A hold request where the details don't matter to the case.
+---
+A hold request where the seat count doesn't matter to the case. The reference
+does, because the cases look the hold up by it, so it is pinned.
+---
 fn anyRequest() -> HoldRequest {
 	HoldRequest {
 		id: Val[HoldId]("H-0001"),
