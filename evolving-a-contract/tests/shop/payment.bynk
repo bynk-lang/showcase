@@ -5,6 +5,11 @@ case "a charge that leaves out the currency is taken in pounds" {
 	expect a == Authorisation { approved: true, method: "card" }
 }
 
+case "a small charge is taken from the wallet" {
+	let a <- authorise.call(Charge { pence: 1_000 })
+	expect a == Authorisation { approved: true, method: "wallet" }
+}
+
 case "a charge over £100 is declined" {
 	let a <- authorise.call(Charge { pence: 10_001 })
 	expect !a.approved

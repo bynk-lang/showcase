@@ -7,6 +7,13 @@ suite shop.orders as system {
 		expect r == "paid by card"
 	}
 
+	// `method` is chosen by the callee, so reading "wallet" here shows the
+	// field crossed the wire and was decoded on the caller's side.
+	case "a small order is paid from the wallet, across the wire" {
+		let r <- shop.orders.place(500)
+		expect r == "paid by wallet"
+	}
+
 	case "a large order is declined" {
 		let r <- shop.orders.place(20_000)
 		expect r == "declined"

@@ -28,7 +28,7 @@ service authorise {
 	on call(charge: Charge) -> Effect[Authorisation] {
 		Authorisation {
 			approved: charge.currency == "GBP" && charge.pence <= 10_000,
-			method: "card",
+			method: if charge.pence <= 1_000 { "wallet" } else { "card" },
 		}
 	}
 }
