@@ -1,0 +1,11 @@
+suite shop.payment
+
+case "an order up to £100 is approved, and the method takes its default" {
+	let a <- authorise.call(10_000)
+	expect a == Authorisation { approved: true, method: "card" }
+}
+
+case "an order over £100 is declined" {
+	let a <- authorise.call(10_001)
+	expect !a.approved
+}

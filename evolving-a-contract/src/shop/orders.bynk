@@ -1,0 +1,15 @@
+---
+The caller. It is compiled against `shop.payment`'s contract as it was at
+build time, and every call carries a hash of that contract, so the callee can
+tell a caller that was built against a different one.
+---
+context shop.orders
+
+consumes shop.payment as Payment
+
+service place {
+	on call(pence: Int) -> Effect[String] {
+		let a <- Payment.authorise(pence)
+		if a.approved { "paid by \(a.method)" } else { "declined" }
+	}
+}

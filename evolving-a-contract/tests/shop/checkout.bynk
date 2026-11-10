@@ -1,0 +1,14 @@
+// At `system` each context runs as the Worker it deploys as, and the call from
+// `shop.orders` to `shop.payment` crosses the real wire: serialised, checked
+// against the contract hash, and decoded on the other side.
+suite shop.orders as system {
+	case "a small order is paid by card, across the wire" {
+		let r <- shop.orders.place(2_500)
+		expect r == "paid by card"
+	}
+
+	case "a large order is declined" {
+		let r <- shop.orders.place(20_000)
+		expect r == "declined"
+	}
+}

@@ -27,6 +27,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`scheduled-jobs`](scheduled-jobs/) | cron handlers, driven from tests at a chosen time | [Cron](https://bynk-lang.org/book/guides/entry-points/cron/) |
 | [`queues`](queues/) | sending to a queue, consuming it, `Ack` and `Retry` | [Queue](https://bynk-lang.org/book/guides/entry-points/queue/) |
 | [`events`](events/) | declaring, emitting and subscribing to events | [Understand events](https://bynk-lang.org/book/guides/events/understand-events/) |
+| [`evolving-a-contract`](evolving-a-contract/) | one context calling another, tested across the real wire, and a response field added with a default so the callee can deploy first | [Contract skew](https://bynk-lang.org/book/guides/projects-build-and-deployment/contract-skew/) |
 | [`localisation`](localisation/) | message bundles, ICU plurals, `Locale` negotiation | [Understand localisation](https://bynk-lang.org/book/guides/localisation/understand-localisation/) |
 | [`concurrency`](concurrency/) | `par`, `race` and `within`, tested on virtual time | [Run calls at the same time](https://bynk-lang.org/book/guides/effects-and-capabilities/run-independent-calls-at-the-same-time/) |
 | [`public-surface`](public-surface/) | a library's public surface: `private`, options records, `uses` | [Design a public surface](https://bynk-lang.org/book/guides/program-structure/design-a-public-surface/) |

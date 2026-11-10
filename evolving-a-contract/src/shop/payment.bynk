@@ -1,0 +1,21 @@
+---
+The callee. `shop.orders` calls `authorise` across a Service Binding, and the
+two contexts deploy as separate Workers, so this contract changes while callers
+built against the old one are still live.
+---
+context shop.payment
+
+type Authorisation = {
+	approved: Bool,
+	// Added after `approved` was live. A field with a default is a compatible
+	// change in a response: a caller compiled before it ignores it, and a
+	// caller compiled after it gets the default if an older callee leaves it
+	// out. So this context can deploy ahead of its callers.
+	method: String = "card",
+}
+
+service authorise {
+	on call(pence: Int) -> Effect[Authorisation] {
+		Authorisation { approved: pence <= 10_000 }
+	}
+}
