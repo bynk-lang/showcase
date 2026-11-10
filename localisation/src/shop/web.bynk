@@ -1,8 +1,5 @@
 context shop.web
 
-// Nothing here names a locale type, but the unit test's `Locale` stub needs it
-// in scope until bynk-lang/bynk#2994 is fixed.
-uses bynk.locale.types
 uses shop.messages
 consumes bynk { Locale }
 
