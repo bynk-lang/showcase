@@ -8,10 +8,13 @@ case needs a different answer; every other operation keeps its double.
 ---
 suite holds.desk
 
---- A hold request where the details don't matter to the case.
+---
+A hold request where the seat count doesn't matter to the case. The reference
+does, because the cases look the hold up by it, so it is pinned.
+---
 fn anyRequest() -> HoldRequest {
 	HoldRequest {
-		id: Val[HoldId]("H-0001"),
+		id: Val[HoldId]("H-0042"),
 		seats: Val[Seats],
 	}
 }
@@ -26,13 +29,13 @@ case "a new hold is stamped with the clock's time, which is the epoch" {
 
 case "a placed hold can be read back from the in-memory Kv" {
 	let _ <- api.POST("/holds", anyRequest()) by Visitor
-	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	let r <- api.GET("/holds/:id", "H-0042") by Visitor
 	expect r is Ok(_)
 	expect Kv.putTtl called once
 }
 
 case "every case starts with an empty Kv" {
-	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	let r <- api.GET("/holds/:id", "H-0042") by Visitor
 	expect r is NotFound
 }
 
@@ -40,14 +43,14 @@ case "a hold is still live a second before it lapses" {
 	// The first `now` stamps the hold; the second is the lookup.
 	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(0) + 14.minutes + 59.seconds]
 	let _ <- api.POST("/holds", anyRequest()) by Visitor
-	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	let r <- api.GET("/holds/:id", "H-0042") by Visitor
 	expect r is Ok(_)
 }
 
 case "a hold is gone fifteen minutes after it was placed" {
 	stub Clock.now() returns each [Instant.fromEpochMillis(0), Instant.fromEpochMillis(0) + 15.minutes]
 	let _ <- api.POST("/holds", anyRequest()) by Visitor
-	let r <- api.GET("/holds/:id", "H-0001") by Visitor
+	let r <- api.GET("/holds/:id", "H-0042") by Visitor
 	expect r is Gone
 }
 
@@ -74,5 +77,5 @@ case "a failing store faults the lookup" {
 	// `fails` is a fault, not an `Err`: the handler cannot catch it, so the
 	// case claims it with `faults` on the call itself.
 	stub Kv.get(_) fails
-	expect api.GET("/holds/:id", "H-0001") by Visitor faults
+	expect api.GET("/holds/:id", "H-0042") by Visitor faults
 }

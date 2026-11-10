@@ -5,7 +5,7 @@ for how long. Pure code in a commons, so its tests need no doubles at all.
 commons holds.policy
 
 --- A hold reference as the box office prints it, such as `H-0042`.
-type HoldId = String where Matches("H-[0-9]{4}")
+type HoldId = String where Matches("H-[0-9]{4}") @example("H-0001")
 
 --- One booking holds between one and eight seats.
 type Seats = Int where InRange(1, 8)

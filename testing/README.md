@@ -28,19 +28,24 @@ grow logic of its own.
 1. [`src/holds/policy.bynk`](src/holds/policy.bynk): the rules. `Seats` is
    `Int where InRange(1, 8)`, a `HoldId` is `H-` and four digits, such as
    `H-0042`, and `isLive` says whether a hold is still inside its fifteen
-   minutes.
+   minutes. `Val` can't invent a string that matches a pattern, so `HoldId`
+   carries an `@example`, which the compiler checks against the pattern:
+
+   ```bynk
+   type HoldId = String where Matches("H-[0-9]{4}") @example("H-0001")
+   ```
 2. [`src/holds/desk.bynk`](src/holds/desk.bynk): an HTTP service that stamps
    a hold with `Clock.now()`, stores it in `Kv`, and answers `Gone` once it
    has lapsed.
 3. [`tests/holds/policy.bynk`](tests/holds/policy.bynk): the commons suite.
    Pure functions need no doubles. A helper builds a hold, using `Val` for
-   the seat count because it doesn't matter, and pinning the `HoldId` because
-   `Val` can't invent a string that matches a pattern:
+   the reference and the seat count because neither matters to the cases that
+   use it:
 
    ```bynk
    fn placedAtEpoch() -> Hold {
    	Hold {
-   		id: Val[HoldId]("H-0001"),
+   		id: Val[HoldId],
    		seats: Val[Seats],
    		placedAt: Instant.fromEpochMillis(0),
    	}
@@ -55,9 +60,14 @@ grow logic of its own.
    fixture groupBooking = "fixtures/group-booking.json"
    ```
 
+   Where the value matters, as when comparing the decoded fixture, pin it:
+   `Val[HoldId]("H-0042")` is that reference, checked against the pattern.
+
 4. [`tests/holds/desk.bynk`](tests/holds/desk.bynk): the context suite,
-   driving `api.POST` and `api.GET`. With no stub, a new hold is stamped at
-   the epoch, a hold reads back from the in-memory `Kv`, and the next case
+   driving `api.POST` and `api.GET`. Its cases look a hold up by reference, so
+   its helper pins `Val[HoldId]("H-0042")`, a reference other than the
+   `@example`, so the pin is visibly deliberate. With no stub, a new hold is
+   stamped at the epoch, a hold reads back from the in-memory `Kv`, and the next case
    finds `Kv` empty again. To test expiry, a sequenced stub gives each call to
    `Clock.now()` its own answer, the first for placing the hold and the second
    for looking it up:
@@ -91,6 +101,7 @@ curl localhost:8787/holds/H-0042
 - [Testing reference](https://bynk-lang.org/book/reference/testing/), including
   [platform capabilities under test](https://bynk-lang.org/book/reference/testing/#platform-doubles)
 - [Test fixtures](https://bynk-lang.org/book/reference/fixtures/)
+- [`@example`: a value for a pattern](https://bynk-lang.org/book/reference/testing/#val-example)
 - Showcase: [`capabilities-and-providers`](../capabilities-and-providers/) for
   the seams a test double plugs into, and
   [`refined-types`](../refined-types/) for the types `Val` fabricates.
