@@ -59,8 +59,9 @@ The cases cover the trusted repository, another repository, and a token with no
 [`tests/ci/seam.bynk`](tests/ci/seam.bynk) is a `system` suite, which runs the
 deployable Worker with its real auth seam. There the test driver is the issuer:
 it generates a key pair, answers the Worker's fetch of the actor's `jwks` URL,
-and mints each call's token. `by Workload(…)` presents a valid one, and four
-failure principals present one the seam must refuse:
+and mints each call's token. `by Workload(…)` presents a valid one, `Nobody`
+sends no token at all, and four failure principals present one the seam must
+refuse:
 
 ```bynk
 let forged <- release.POST("/release") by Forged          // signed by a key the JWKS lacks

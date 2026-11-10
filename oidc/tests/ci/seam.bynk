@@ -2,6 +2,8 @@
 // The driver is the issuer: it generates a key pair, answers the Worker's fetch
 // of the actor's `jwks` URL, and mints the token each call presents. Only the
 // test module holds that key, so nothing in the deployed Worker trusts it.
+// A token the seam refuses is a `401` before the handler runs, so it reads as
+// `Rejected(Unauthorized)`; the handler's own `403` reads as plain `Forbidden`.
 suite ci.release as system {
 	case "a valid token from the trusted repository is admitted" {
 		let r <- release.POST(
