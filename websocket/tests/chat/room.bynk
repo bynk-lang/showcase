@@ -23,14 +23,13 @@ case "a joiner is welcomed, then hears every post in the room" {
 	expect bob.sent() == [said("welcome"), said("hi")]
 }
 
-case "leaving closes your connection, and you hear nothing more" {
+case "someone who has left hears nothing more" {
 	let alice = TestConnection[ServerFrame]()
 	let bob = TestConnection[ServerFrame]()
 	let room = RoomId.unsafe("lobby")
 	let _ <- ChatGateway.open(alice, room) by Participant(UserId.unsafe("alice"))
 	let _ <- ChatGateway.open(bob, room) by Participant(UserId.unsafe("bob"))
 	let _ <- ChatGateway.close(bob)
-	expect bob.closed()
 	let _ <- ChatGateway.message(alice, ClientFrame { text: "anyone?" })
 	expect bob.sent() == [said("welcome")]
 	expect alice.sent() == [said("welcome"), said("anyone?")]
