@@ -1,0 +1,32 @@
+---
+Splitting a catalogue into pages. Each function states what it needs from its
+caller (`requires`) and what it promises in return (`ensures`), next to the
+code those clauses are about.
+---
+commons catalogue.paging
+
+---
+How many pages `items` fill at `perPage` to a page. The last page may be
+partly full, but never empty.
+---
+fn pageCount(items: Int, perPage: Int) -> Int
+	requires items_in_range: items >= 0 && items <= 1_000_000
+	requires per_page: perPage >= 1 && perPage <= 100
+	ensures holds_every_item: result * perPage >= items
+	ensures no_empty_page: (result - 1) * perPage < items || result == 0
+{
+	(items + perPage - 1) / perPage
+}
+
+---
+How many items come before `page`, numbering pages from 1: the offset a query
+starts reading at.
+---
+fn offset(page: Int, perPage: Int) -> Int
+	requires numbered_from_one: page >= 1 && page <= 10_000
+	requires per_page: perPage >= 1 && perPage <= 100
+	ensures from_the_start: result >= 0
+	ensures whole_pages: result.rem(perPage) == 0
+{
+	(page - 1) * perPage
+}

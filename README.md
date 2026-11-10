@@ -23,6 +23,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`sql-databases`](sql-databases/) | a D1 database: migrations, `"""sql` statements, typed reads with `select[T]` and `firstAs[T]`, SQL checked against the schema at compile time, `Sql` and `Decode` errors | [Query rows into a record](https://bynk-lang.org/book/guides/effects-and-capabilities/query-rows-into-a-record/) |
 | [`testing`](testing/) | tests in the language: stubs, platform doubles, fixtures | [Write tests](https://bynk-lang.org/book/guides/testing/write-tests/) |
 | [`mutation-testing`](mutation-testing/) | `bynk test --mutate`: would the suite notice if the code were wrong? A rule whose every mutant is killed | [Run your tests](https://bynk-lang.org/book/guides/testing/run-tests/) |
+| [`function-contracts`](function-contracts/) | `requires` and `ensures` on a pure function, checked at every call and attacked by the test runner, and the `dev` and `release` profiles | [Contracts](https://bynk-lang.org/book/reference/testing/#contracts) |
 | [`actors-and-authorisation`](actors-and-authorisation/) | public and authenticated routes, claim checks, an agent keyed by the caller | [Authorisation](https://bynk-lang.org/book/guides/actors/authorisation/) |
 | [`verify-webhooks`](verify-webhooks/) | signed webhooks verified for you; signing your own data | [Verify webhooks](https://bynk-lang.org/book/guides/actors/verify-webhooks/) |
 | [`scheduled-jobs`](scheduled-jobs/) | cron handlers, driven from tests at a chosen time | [Cron](https://bynk-lang.org/book/guides/entry-points/cron/) |
