@@ -1,0 +1,32 @@
+// At `system` each call goes through the deployable Worker's real `Oidc` seam.
+// The driver is the issuer: it generates a key pair, answers the Worker's fetch
+// of the actor's `jwks` URL, and mints the token each call presents. Only the
+// test module holds that key, so nothing in the deployed Worker trusts it.
+suite ci.release as system {
+	case "a valid token from the trusted repository is admitted" {
+		let r <- release.POST(
+			"/release"
+		) by Workload("wid", TokenClaims.of(["repository: acme/money"]))
+		expect r == Ok("released by wid")
+	}
+
+	case "a valid token from another repository passes the seam, then is forbidden" {
+		let r <- release.POST(
+			"/release"
+		) by Workload("wid", TokenClaims.of(["repository: evil/fork"]))
+		expect r is Forbidden
+	}
+
+	case "tokens the seam must refuse never reach the handler" {
+		let none <- release.POST("/release") by Nobody
+		let forged <- release.POST("/release") by Forged
+		let expired <- release.POST("/release") by Expired
+		let wrongIss <- release.POST("/release") by WrongIssuer
+		let wrongAud <- release.POST("/release") by WrongAudience
+		expect none is Rejected(Unauthorized)
+		expect forged is Rejected(Unauthorized)
+		expect expired is Rejected(Unauthorized)
+		expect wrongIss is Rejected(Unauthorized)
+		expect wrongAud is Rejected(Unauthorized)
+	}
+}
