@@ -41,6 +41,7 @@ case "a post stays in its own room" {
 	let _ <- ChatGateway.open(alice, RoomId.unsafe("lobby")) by Participant(UserId.unsafe("alice"))
 	let _ <- ChatGateway.open(carol, RoomId.unsafe("garden")) by Participant(UserId.unsafe("carol"))
 	let _ <- ChatGateway.message(alice, ClientFrame { text: "hi" })
+	expect alice.sent() == [said("welcome"), said("hi")]
 	expect carol.sent() == [said("welcome")]
 }
 
@@ -55,4 +56,18 @@ case "the room broadcasts to every connection it holds" {
 	let _ <- room.post(UserId.unsafe("ada"), "tea?")
 	expect ada.sent() == [said("tea?")]
 	expect grace.sent() == [said("tea?")]
+}
+
+// `conns.remove` closes the connection it held: the server closes it, so
+// `closed()` reports it, and nothing more is sent to it.
+case "a member who leaves is closed and hears nothing more" {
+	let ada = TestConnection[ServerFrame]()
+	let grace = TestConnection[ServerFrame]()
+	let room = Room(RoomId.unsafe("lab"))
+	let _ <- room.join(UserId.unsafe("ada"), ada.connection())
+	let _ <- room.join(UserId.unsafe("grace"), grace.connection())
+	let _ <- room.leave(UserId.unsafe("grace"))
+	let _ <- room.post(UserId.unsafe("ada"), "tea?")
+	expect grace.sent() == []
+	expect grace.closed()
 }
