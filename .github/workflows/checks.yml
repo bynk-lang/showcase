@@ -51,3 +51,11 @@ jobs:
           version-file: ${{ inputs.version == '' && 'BYNK_VERSION' || '' }}
           working-directory: ${{ matrix.project }}
           source: .
+      # A project opts in to a mutation-score gate with a `.mutation-gate` file
+      # holding the minimum score. Only at the pinned version: a new release can
+      # add mutation operators, and the canary shouldn't hold back a bump for a
+      # missing case. The bump PR itself still runs the gate at the new version.
+      - name: Mutation score
+        if: inputs.version == '' && hashFiles(format('{0}/.mutation-gate', matrix.project)) != ''
+        working-directory: ${{ matrix.project }}
+        run: bynk test --mutate --mutate-fail-under "$(cat .mutation-gate)"
