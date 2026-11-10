@@ -1,0 +1,9 @@
+[project]
+name = "function-contracts"
+version = "0.1.0"
+
+# `bynk test` builds the `dev` profile, which keeps the contract guard: every
+# call checks its `requires` and `ensures`. This is the default, written out.
+# A deploy builds `release`, which never carries it.
+[profile.dev]
+contracts = true

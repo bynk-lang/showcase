@@ -1,0 +1,26 @@
+---
+The contracts in `src/` need no case to be checked: the runner generates
+arguments that meet each `requires` and checks each `ensures` on every one. The
+cases here pin down exact answers, which no contract states.
+---
+suite catalogue.paging
+
+case "an empty catalogue has no pages" {
+	expect pageCount(0, 20) == 0
+}
+
+case "a full last page needs no extra page" {
+	expect pageCount(40, 20) == 2
+}
+
+case "one item over starts another page" {
+	expect pageCount(41, 20) == 3
+}
+
+case "the first page starts at the beginning" {
+	expect offset(1, 20) == 0
+}
+
+case "the third page skips two pages' worth" {
+	expect offset(3, 20) == 40
+}
