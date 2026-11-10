@@ -12,7 +12,7 @@ A `D1` capability is a SQLite database. You declare one by name,
 the shape of the table lives in one place, and every test case and `bynk dev`
 start with it applied.
 
-Three rules keep the SQL safe and the rows typed:
+Four rules keep the SQL safe and the rows typed:
 
 - **The SQL is a literal.** Every statement is a string literal, so request
   data reaches it only as a bound parameter (`?1`, `Text(isbn)`). A variable or
@@ -20,6 +20,14 @@ Three rules keep the SQL safe and the rows typed:
   reads best as a multi-line string, and the `sql` tag after the opening
   `"""` tells editors to highlight it as SQL. The tag is not part of the
   value.
+- **The SQL is checked against the schema.** Because every statement is a
+  literal, `bynk check` (and the editor) can apply `migrations/` to an empty
+  SQLite and prepare each statement against it, without running anything. A
+  misspelt table or column is `bynk.d1.sql_invalid`, a statement that uses a
+  different number of `?N` than its list passes is `bynk.d1.sql_param_count`,
+  and a `select[Book]` whose `Book` has a field with no column is
+  `bynk.d1.select_field_missing`. They are compile errors, not a failing
+  request.
 - **The row is a record.** `select[Book]` and `firstAs[Book]` write
   `SELECT "isbn", "title", …` from `Book`'s fields, so you write the statement
   from `FROM` on and the column list is never spelt twice.
@@ -108,7 +116,10 @@ before writing anything, which shows the schema is already there. A case can
 call `Books` directly, so the last three reach under the service. One writes a
 zero-page book and gets `Constraint` back from the `CHECK`. One swaps in a
 loose table holding a `finished` of `2`, and the read logs a `Decode` at
-`$.finished`. The last drops the table, and the read logs a `Sql` failure. In
+`$.finished`. Its `CREATE TABLE IF NOT EXISTS` is a workaround: the schema
+check prepares the statements of a `batch` one by one against the migrated
+schema, where `books` still exists after the `DROP` before it
+([bynk-lang/bynk#3197](https://github.com/bynk-lang/bynk/issues/3197)). The last drops the table, and the read logs a `Sql` failure. In
 both, the caller sees only the plain message.
 
 ## Run it
@@ -136,7 +147,8 @@ curl localhost:8787/books/9780156027601
   `select[T]` and `firstAs[T]`, step by step.
 - [SQL databases: `D1`](https://bynk-lang.org/book/reference/bynk-capabilities/#sql-databases-d1):
   every operation, `SqlValue`, `SqlError`, `batch`, and
-  [schema migrations](https://bynk-lang.org/book/reference/bynk-capabilities/#schema-migrations).
+  [schema migrations](https://bynk-lang.org/book/reference/bynk-capabilities/#schema-migrations),
+  including what `bynk check` reports when a statement doesn't fit the schema.
 - [`storage-and-queries`](../storage-and-queries/): state kept in an agent
   rather than a database, read with `Query[T]`.
 - [`results-and-optionals`](../results-and-optionals/): the `Result` and
