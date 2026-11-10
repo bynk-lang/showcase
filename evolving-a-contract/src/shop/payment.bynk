@@ -5,17 +5,30 @@ built against the old one are still live.
 ---
 context shop.payment
 
+--- What a caller asks to be charged.
+type Charge = {
+	pence: Int,
+	// Added after callers were live. A required field added to a request is
+	// breaking: a caller compiled before it doesn't send it. With a default,
+	// the callee fills it in, so the change is compatible and this context
+	// can deploy ahead of its callers.
+	currency: String = "GBP",
+}
+
+--- The answer to a charge.
 type Authorisation = {
 	approved: Bool,
-	// Added after `approved` was live. A field with a default is a compatible
-	// change in a response: a caller compiled before it ignores it, and a
-	// caller compiled after it gets the default if an older callee leaves it
-	// out. So this context can deploy ahead of its callers.
-	method: String = "card",
+	// Also added later, and it needs no default: a field added to a response
+	// is compatible when this context deploys first, since a caller compiled
+	// before it ignores it.
+	method: String,
 }
 
 service authorise {
-	on call(pence: Int) -> Effect[Authorisation] {
-		Authorisation { approved: pence <= 10_000 }
+	on call(charge: Charge) -> Effect[Authorisation] {
+		Authorisation {
+			approved: charge.currency == "GBP" && charge.pence <= 10_000,
+			method: "card",
+		}
 	}
 }

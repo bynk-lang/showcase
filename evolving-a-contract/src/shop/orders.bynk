@@ -9,7 +9,9 @@ consumes shop.payment as Payment
 
 service place {
 	on call(pence: Int) -> Effect[String] {
-		let a <- Payment.authorise(pence)
+		// No `currency`: the field's default fills it in, as it does for a
+		// caller compiled before the field existed.
+		let a <- Payment.authorise(Charge { pence: pence })
 		if a.approved { "paid by \(a.method)" } else { "declined" }
 	}
 }

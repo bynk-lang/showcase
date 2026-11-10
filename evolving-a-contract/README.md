@@ -33,31 +33,38 @@ breaking one needs both sides to move together, which a whole-project
 
 ## Walkthrough
 
-[`src/shop/payment.bynk`](src/shop/payment.bynk) is the callee. Its response
+[`src/shop/payment.bynk`](src/shop/payment.bynk) is the callee. Its request
 gained a field after callers were live, and it was added with a default:
+
+```bynk
+type Charge = {
+	pence: Int,
+	currency: String = "GBP",
+}
+```
+
+The default is what makes this compatible. A caller compiled before `currency`
+existed doesn't send it, and the callee fills in `"GBP"`. Added as a plain
+required field, the same change would be breaking: the callee couldn't decode a
+request from a live caller, so both would have to deploy together.
+
+Its response gained a field too, and that one needs no default. When the callee
+deploys first, the only skewed pair is an old caller and a new callee, and a
+caller compiled before `method` existed ignores it:
 
 ```bynk
 type Authorisation = {
 	approved: Bool,
-	method: String = "card",
+	method: String,
 }
 ```
 
-A caller compiled before `method` existed ignores it. A caller compiled after
-it, talking to a callee that doesn't send it yet, gets `"card"`. The handler
-shows the other side of a default: a literal can leave the field out.
+[`src/shop/orders.bynk`](src/shop/orders.bynk) is the caller. It leaves
+`currency` out, so the default applies, and reads `method` like any other
+field:
 
 ```bynk
-on call(pence: Int) -> Effect[Authorisation] {
-	Authorisation { approved: pence <= 10_000 }
-}
-```
-
-[`src/shop/orders.bynk`](src/shop/orders.bynk) is the caller. It reads
-`method` like any other field:
-
-```bynk
-let a <- Payment.authorise(pence)
+let a <- Payment.authorise(Charge { pence: pence })
 if a.approved { "paid by \(a.method)" } else { "declined" }
 ```
 
@@ -82,6 +89,11 @@ That records the older contract the live caller was built against in
 `bynk.contracts.lock`, which you commit, and builds the callee to answer both
 hashes. Deploy `shop.orders` when you're ready, then delete the entry. A
 breaking change is never accepted this way.
+
+The order only goes one way. A caller can't deploy ahead of its live callee,
+whatever the verdict: the callee refuses a contract hash it wasn't built to
+accept. So the default is what lets *this* change go callee first, and
+`shop.orders` follows once `shop.payment` is live.
 
 ## Run it
 
