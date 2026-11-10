@@ -1,7 +1,6 @@
-// The token's signature, `iss`, `aud` and `exp` are checked by the auth seam,
-// which only exists at `system`; there the driver holds no key pair for the
-// provider's JWKS, so a case can't send a token. Here the handler runs in
-// process and a case supplies the claims a verified token would carry.
+// At the unit tier the handler runs in process: the auth seam is skipped, and a
+// case supplies the claims a verified token would carry. The seam itself, the
+// signature, `iss`, `aud` and `exp` checks, is tested in `seam.bynk`.
 suite ci.release {
 	case "a release from the trusted repository" {
 		let r <- release.POST(

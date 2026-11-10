@@ -54,11 +54,25 @@ expect r == Ok("released by wid")
 ```
 
 The cases cover the trusted repository, another repository, and a token with no
-`repository` claim. The signature, issuer, audience and expiry checks live in the
-auth seam, which the driver can't exercise yet: a `system` case can't call an
-`Oidc` route, because the driver holds no key pair for the JWKS
-(`bynk.test.oidc_needs_in_process`). To drive the real seam, point the actor at
-a fake issuer with `trustFrom`.
+`repository` claim.
+
+[`tests/ci/seam.bynk`](tests/ci/seam.bynk) is a `system` suite, which runs the
+deployable Worker with its real auth seam. There the test driver is the issuer:
+it generates a key pair, answers the Worker's fetch of the actor's `jwks` URL,
+and mints each call's token. `by Workload(…)` presents a valid one, `Nobody`
+sends no token at all, and four failure principals present one the seam must
+refuse:
+
+```bynk
+let forged <- release.POST("/release") by Forged          // signed by a key the JWKS lacks
+let expired <- release.POST("/release") by Expired        // `exp` an hour ago
+let wrongIss <- release.POST("/release") by WrongIssuer   // another `iss`
+let wrongAud <- release.POST("/release") by WrongAudience // another `aud`
+expect forged is Rejected(Unauthorized)
+```
+
+Each is a `401` before the handler runs. Only the test module holds the key, so
+nothing in the deployed Worker trusts it.
 
 ## Run it
 
@@ -71,5 +85,6 @@ bynk test .
 - [Authenticate with OIDC / JWKS](https://bynk-lang.org/book/guides/actors/authenticate-with-oidc/)
 - [Reference: Actors, reading claims](https://bynk-lang.org/book/reference/actors/#reading-claims)
 - [Reference: Testing, passing token claims](https://bynk-lang.org/book/reference/testing/#token-claims)
+- [Reference: Testing, an `Oidc` route at `system`](https://bynk-lang.org/book/reference/testing/#oidc-issuer)
 - [`actors-and-authorisation`](../actors-and-authorisation/) for `Bearer` actors,
   refusals and authorisation invariants
