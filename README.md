@@ -20,8 +20,9 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`capabilities-and-providers`](capabilities-and-providers/) | `given`, declaring a capability, providing and wrapping one | [The capability model](https://bynk-lang.org/book/guides/effects-and-capabilities/understand-the-capability-model/) |
 | [`agent-state-machine`](agent-state-machine/) | agents, a `Cell`, and invariants | [State machine](https://bynk-lang.org/book/guides/agents-and-state/state-machine/) |
 | [`storage-and-queries`](storage-and-queries/) | agent storage (`Map`, `Cache`, `Log`) and `Query[T]` | [Agents](https://bynk-lang.org/book/reference/agents/) |
-| [`sql-databases`](sql-databases/) | a D1 database: migrations, `"""sql` statements, typed reads with `select[T]` and `firstAs[T]`, `Sql` and `Decode` errors | [Query rows into a record](https://bynk-lang.org/book/guides/effects-and-capabilities/query-rows-into-a-record/) |
+| [`sql-databases`](sql-databases/) | a D1 database: migrations, `"""sql` statements, typed reads with `select[T]` and `firstAs[T]`, SQL checked against the schema at compile time, `Sql` and `Decode` errors | [Query rows into a record](https://bynk-lang.org/book/guides/effects-and-capabilities/query-rows-into-a-record/) |
 | [`testing`](testing/) | tests in the language: stubs, platform doubles, fixtures | [Write tests](https://bynk-lang.org/book/guides/testing/write-tests/) |
+| [`mutation-testing`](mutation-testing/) | `bynk test --mutate`: would the suite notice if the code were wrong? A rule whose every mutant is killed | [Run your tests](https://bynk-lang.org/book/guides/testing/run-tests/) |
 | [`function-contracts`](function-contracts/) | `requires` and `ensures` on a pure function, checked at every call and attacked by the test runner, and the `dev` and `release` profiles | [Contracts](https://bynk-lang.org/book/reference/testing/#contracts) |
 | [`actors-and-authorisation`](actors-and-authorisation/) | public and authenticated routes, claim checks, an agent keyed by the caller | [Authorisation](https://bynk-lang.org/book/guides/actors/authorisation/) |
 | [`verify-webhooks`](verify-webhooks/) | signed webhooks verified for you; signing your own data | [Verify webhooks](https://bynk-lang.org/book/guides/actors/verify-webhooks/) |
@@ -37,7 +38,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`files-in-r2`](files-in-r2/) | R2 object storage: a write-once upload, a download, and a prefix listing, tested on the in-memory double | [Store files in R2](https://bynk-lang.org/book/guides/effects-and-capabilities/store-files-in-r2/) |
 | [`serve-a-page`](serve-a-page/) | keeping markup in an `.html` embed, filling it in, and serving it as a `Raw` HTML response | [Serve a page](https://bynk-lang.org/book/guides/entry-points/serve-a-page/) |
 | [`oidc`](oidc/) | `Oidc` actors verify an identity provider's tokens against its public JWKS, and a handler reads the verified claims | [Authenticate with OIDC](https://bynk-lang.org/book/guides/actors/authenticate-with-oidc/) |
-| [`websocket`](websocket/) | accepting a WebSocket upgrade authenticated at the edge, handing the `Connection` to an agent, and broadcasting to a room (not yet testable with `bynk test`) | [Handle a WebSocket connection](https://bynk-lang.org/book/guides/entry-points/websocket/) |
+| [`websocket`](websocket/) | accepting a WebSocket upgrade authenticated at the edge, handing the `Connection` to an agent, and broadcasting to a room, tested against a `TestConnection` | [Handle a WebSocket connection](https://bynk-lang.org/book/guides/entry-points/websocket/) |
 
 ## Running a project
 
