@@ -51,6 +51,11 @@ bynk test .      # run its tests
 bynk dev          # serve it locally, if it has an HTTP context
 ```
 
+The repository root is a [workspace](https://bynk-lang.org/book/guides/projects-build-and-deployment/layout/#workspaces)
+([`bynk.toml`](bynk.toml)), so from the root `bynk test`, `bynk check` and
+`bynk fmt .` run over every project in turn, each with its own settings.
+`bynk dev` and `bynk deploy` run one project, so use them from its directory.
+
 ## What counts as Bynkish here
 
 CI holds every project to the same bar:

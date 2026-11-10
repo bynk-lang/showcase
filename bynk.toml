@@ -1,0 +1,5 @@
+# The showcase is a workspace: each top-level directory is its own project.
+# From here, `bynk check`, `bynk fmt .` and `bynk test` run over every project
+# in turn, each against its own `bynk.toml`. To serve or deploy one, `cd` into it.
+[workspace]
+members = ["*"]
