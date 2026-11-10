@@ -1,7 +1,9 @@
 ---
 The contracts in `src/` need no case to be checked: the runner generates
 arguments that meet each `requires` and checks each `ensures` on every one. The
-cases here pin down exact answers, which no contract states.
+cases pin down exact answers. `pageCount`'s contract already determines its
+result, so its cases are worked examples; `offset`'s contract is partial (it
+holds for a body of `0`), so its cases are the ones doing the checking.
 ---
 suite catalogue.paging
 

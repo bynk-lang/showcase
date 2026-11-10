@@ -10,7 +10,7 @@ How many pages `items` fill at `perPage` to a page. The last page may be
 partly full, but never empty.
 ---
 fn pageCount(items: Int, perPage: Int) -> Int
-	requires some_or_none: items >= 0 && items <= 1_000_000
+	requires items_in_range: items >= 0 && items <= 1_000_000
 	requires per_page: perPage >= 1 && perPage <= 100
 	ensures holds_every_item: result * perPage >= items
 	ensures no_empty_page: (result - 1) * perPage < items || result == 0

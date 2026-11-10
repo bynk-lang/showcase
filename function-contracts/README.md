@@ -12,7 +12,7 @@ body:
 
 ```bynk
 fn pageCount(items: Int, perPage: Int) -> Int
-	requires some_or_none: items >= 0 && items <= 1_000_000
+	requires items_in_range: items >= 0 && items <= 1_000_000
 	requires per_page: perPage >= 1 && perPage <= 100
 	ensures holds_every_item: result * perPage >= items
 	ensures no_empty_page: (result - 1) * perPage < items || result == 0
@@ -62,11 +62,20 @@ The upper bounds in the `requires` are part of the terms too: they say which
 inputs the function is for, and they keep the runner's generated arguments in a
 range where the arithmetic means something.
 
+The two functions show the two kinds of contract. `pageCount`'s is a complete
+specification: together, "every item is on a page" and "no page is empty"
+leave exactly one possible answer, so any body that meets them is right.
+`offset`'s is partial: "never negative" and "a whole number of pages" also hold
+for a body of `0`, or for the off-by-one `page * perPage`.
+
+That's where cases earn their place.
 [`tests/catalogue/paging.bynk`](tests/catalogue/paging.bynk) pins down exact
-answers, such as `pageCount(41, 20) == 3`, which no contract states. It doesn't
-restate a contract: a case or `property` that only repeats an `ensures` is
-flagged as redundant (`bynk.contract.restated_by_test`). Use `ensures` for a
-claim about one result, and a `property` for one that relates several calls.
+answers, such as `offset(3, 20) == 40`, which `offset`'s contract doesn't
+state. The `pageCount` cases are worked examples of a contract that already
+says everything. No case restates a contract: a case or `property` that only
+repeats an `ensures` is flagged as redundant
+(`bynk.contract.restated_by_test`). Use `ensures` for a claim about one result,
+and a `property` for one that relates several calls.
 
 [`bynk.toml`](bynk.toml) writes out the `dev` profile's default:
 
@@ -85,9 +94,10 @@ checks.
 bynk test .
 ```
 
-To see a contract fail, change `pageCount`'s body to `items / perPage` and run
-the tests again: the runner finds an input where the pages no longer hold every
-item.
+To see a contract catch what the cases miss, change `pageCount`'s body to
+`(items + 19) / perPage`. Every case still passes, since they all use 20 to a
+page, but the runner finds an input where a page is left empty, such as no
+items at one to a page.
 
 ## Read next
 
