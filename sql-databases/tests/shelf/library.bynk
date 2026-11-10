@@ -66,14 +66,19 @@ case "the table's CHECKs refuse a row Book would refuse" {
 
 // The migration's table can't hold a row `Book` refuses, so this case swaps in
 // a loose one, as if the schema had drifted from the record.
+//
+// `IF NOT EXISTS` is a workaround, not the idiom: `bynk check` prepares each
+// statement of a batch against the migrated schema on its own, where `books`
+// still exists. Drop it once https://github.com/bynk-lang/bynk/issues/3197
+// lands.
 case "a row that does not fit Book is a Decode error, logged and hidden" {
-	let _ <- Books.batch([
+	let swapped <- Books.batch([
 		SqlStatement {
 			sql: "DROP TABLE books",
 			params: [],
 		},
 		SqlStatement {
-			sql: "CREATE TABLE books (isbn, title, author, pages, finished)",
+			sql: "CREATE TABLE IF NOT EXISTS books (isbn, title, author, pages, finished)",
 			params: [],
 		},
 		SqlStatement {
@@ -81,6 +86,7 @@ case "a row that does not fit Book is a Decode error, logged and hidden" {
 			params: [],
 		},
 	])
+	expect swapped is Ok(_)
 	let r <- api.GET("/books/:isbn", "x") by Visitor
 	expect r is ServerError("the reading list is unavailable")
 	expect Logger.error called once with msg.startsWith("a books row did not fit Book: StructuralMismatch at $.finished")
