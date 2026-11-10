@@ -1,0 +1,27 @@
+---
+Each case pins down one way the rule could be wrong. `bynk test --mutate`
+checks that claim: it changes `charge` and `total` one small way at a time,
+and every change must fail at least one case here.
+---
+suite shop.delivery
+
+// Kills `||` → `&&`, and the `if` condition replaced by `false`.
+case "a member ships free on any basket" {
+	expect charge(100, true) == 0
+}
+
+// Kills `>=` → `>`. Without a case at exactly the threshold, that mutant
+// survives: a basket of £10 and one of £60 can't tell the two apart.
+case "a basket of exactly £50 ships free" {
+	expect charge(5000, false) == 0
+}
+
+// Kills the `if` condition replaced by `true`.
+case "a penny under £50 pays standard delivery" {
+	expect charge(4999, false) == 399
+}
+
+// Kills `+` → `-`.
+case "the total adds the delivery charge" {
+	expect total(1000, false) == 1399
+}

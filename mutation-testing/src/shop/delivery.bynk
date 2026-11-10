@@ -1,0 +1,25 @@
+---
+What a shop charges to deliver a basket. Pure code in a commons: the kind of
+small rule a test can pass over without pinning down, which is what
+`bynk test --mutate` finds out.
+---
+commons shop.delivery
+
+--- A basket worth this much, in pence, or more ships free.
+const FreeFrom: Int = 5000
+
+--- What delivery costs, in pence, below [FreeFrom].
+const Standard: Int = 399
+
+---
+The delivery charge, in pence. Members never pay it, and nor does a basket
+worth [FreeFrom] or more.
+---
+fn charge(basket: Int, member: Bool) -> Int {
+	if member || basket >= FreeFrom { 0 } else { Standard }
+}
+
+--- What the customer pays, in pence: the basket plus its delivery.
+fn total(basket: Int, member: Bool) -> Int {
+	basket + charge(basket, member)
+}

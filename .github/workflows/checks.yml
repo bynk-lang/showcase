@@ -51,3 +51,8 @@ jobs:
           version-file: ${{ inputs.version == '' && 'BYNK_VERSION' || '' }}
           working-directory: ${{ matrix.project }}
           source: .
+      # mutation-testing claims its suite kills every mutant, so hold it to that.
+      - name: Mutation score
+        if: matrix.project == 'mutation-testing'
+        working-directory: ${{ matrix.project }}
+        run: bynk test --mutate --mutate-fail-under 100
