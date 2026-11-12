@@ -93,8 +93,9 @@ type Chain[T] = {
 It works anywhere inside the unit. It's refused only where a value crosses a
 boundary, a handler signature, a `store` field or an event, because a
 recursive generic has no codec yet (`bynk.generics.recursive_generic_at_boundary`).
-Walking it is a self call in tail position, which Bynk runs as a loop, so a long
-chain doesn't grow the stack.
+Walking it is a self call in tail position, by name in `stepsFrom` and by
+receiver in `last`, which Bynk runs as a loop, so a long chain doesn't grow the
+stack. A test walks a 100,000-step chain both ways.
 
 **`tests/triage/`** checks the edges: an empty queue has no next ticket, a later
 field only breaks ties, `clamp` holds across generated ranges (a `property`),

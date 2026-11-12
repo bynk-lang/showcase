@@ -1,4 +1,9 @@
 suite triage.generic {
+	// Built tail-recursively too, or building the chain would overflow first.
+	fn chainOf(n: Int, acc: Chain[Int]) -> Chain[Int] {
+		if n == 0 { acc } else { chainOf(n - 1, Chain { head: n, next: Some(acc) }) }
+	}
+
 	case "occurrences compares with ==" {
 		let words = ["a", "b", "a"]
 		expect occurrences(words, "a") == 2
@@ -74,5 +79,13 @@ suite triage.generic {
 		}
 		expect solo.length() == 1
 		expect solo.last() == 7
+	}
+
+	// Far deeper than the host's stack: both walks run as loops.
+	case "a long chain is walked without growing the stack" {
+		let long = chainOf(99_999, Chain { head: 0, next: None })
+		expect long.length() == 100_000
+		expect long.head == 1
+		expect long.last() == 0
 	}
 }

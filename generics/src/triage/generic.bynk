@@ -100,14 +100,18 @@ fn Chain.length(self) -> Int {
 Counts on from `n`. The self call is the last thing each step does, a tail
 call, so it runs as a loop: a long chain doesn't grow the stack.
 ---
-fn stepsFrom[T](c: Chain[T], n: Int) -> Int {
+private fn stepsFrom[T](c: Chain[T], n: Int) -> Int {
 	match c.next {
 		Some(rest) => stepsFrom(rest, n + 1),
 		None => n,
 	}
 }
 
---- The step a ticket ends up with once every earlier one has passed it on.
+---
+The step a ticket ends up with once every earlier one has passed it on.
+`rest.last()` is a self call too (a method by its receiver), so this is a loop
+as well.
+---
 fn Chain.last(self) -> T {
 	match self.next {
 		Some(rest) => rest.last(),
