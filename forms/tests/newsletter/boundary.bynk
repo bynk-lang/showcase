@@ -12,13 +12,10 @@ suite newsletter.site as system {
 		expect r is Rejected(RefinementViolation(_))
 	}
 
-	case "a typed upload is sent as multipart and decoded" {
-		let photo = File {
-			filename: Some("cat.jpg"),
-			contentType: "image/jpeg",
-			bytes: Bytes.fromUtf8("meow"),
-		}
-		let r <- site.POST("/photos", PhotoForm { caption: Some("Tom"), photo: photo })
-		expect r is Ok(_)
+	// A multipart `Wire(…)` body is framed with the boundary `bynk-boundary`.
+	case "a browser's upload reaches the handler as a File" {
+		let body = "--bynk-boundary\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"cat.jpg\"\r\nContent-Type: image/jpeg\r\n\r\nmeow\r\n--bynk-boundary--\r\n"
+		let r <- site.POST("/photos", Wire(body))
+		expect r is Handled(Ok("received 4 bytes"))
 	}
 }
