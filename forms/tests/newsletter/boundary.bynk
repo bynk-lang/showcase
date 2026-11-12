@@ -1,0 +1,24 @@
+// At `system` the router decodes the body, so a `Wire(…)` case sends the exact
+// text a browser would and sees what the boundary makes of it: a decoded record
+// reaches the handler (`Handled`), or a `400` is sent before it runs (`Rejected`).
+suite newsletter.site as system {
+	case "a browser's sign-up reaches the handler decoded" {
+		let r <- site.POST("/subscribe", Wire("email=ada%40example.com&name=&weekly=on"))
+		expect r is Handled(Ok("ada@example.com: 0 topics, weekly"))
+	}
+
+	case "a bad address is refused before the handler runs" {
+		let r <- site.POST("/subscribe", Wire("email=nope"))
+		expect r is Rejected(RefinementViolation(_))
+	}
+
+	case "a typed upload is sent as multipart and decoded" {
+		let photo = File {
+			filename: Some("cat.jpg"),
+			contentType: "image/jpeg",
+			bytes: Bytes.fromUtf8("meow"),
+		}
+		let r <- site.POST("/photos", PhotoForm { caption: Some("Tom"), photo: photo })
+		expect r is Ok(_)
+	}
+}

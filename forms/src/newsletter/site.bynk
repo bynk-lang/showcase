@@ -1,0 +1,65 @@
+---
+A newsletter sign-up and a photo upload, posted from plain HTML forms. Each
+body is decoded into a typed record at the boundary, with the same refinements
+and defaults as a JSON body, so a handler only ever sees a valid one.
+---
+context newsletter.site
+
+consumes bynk { File }
+
+--- An address with something either side of an `@`.
+type Email = String where Matches("^[^@]+@[^@]+$")
+
+--- What a subscriber can ask to hear about.
+type Topic = enum { News, Releases, Events }
+
+---
+The sign-up form as a browser posts it. Each field shows one way a form
+differs from JSON: `name` is an `Option`, so an empty input is `None`;
+`topics` is a group of checkboxes sharing one name, so it repeats; and
+`weekly` is a single checkbox, which sends nothing at all when unticked, so it
+needs a default.
+---
+type SignupForm = {
+	email: Email,
+	name: Option[String],
+	topics: List[Topic] = [],
+	weekly: Bool = false,
+}
+
+---
+An upload: a caption, and the photo as a `File`. Its `filename` and
+`contentType` are whatever the client said, so neither is trusted.
+---
+type PhotoForm = {
+	caption: Option[String],
+	photo: File,
+}
+
+--- What the sign-up confirms, worked out from the decoded form alone.
+fn confirmation(form: SignupForm) -> String {
+	let who = match form.name {
+		Some(n) => n,
+		None => "\(form.email)",
+	}
+	let how = if form.weekly { "weekly" } else { "as it happens" }
+	"\(who): \(form.topics.length()) topics, \(how)"
+}
+
+service site from http {
+	// A public form should have a cap. A multipart route must have one, since
+	// the whole body is held in memory while its parts are read.
+	limits { maxBody: 1_000_000, maxFile: 500_000 }
+
+	--- An `application/x-www-form-urlencoded` post; anything else is a `415`.
+	@form
+	on POST("/subscribe") (body: SignupForm) -> Effect[HttpResult[String]] by Visitor {
+		Ok(confirmation(body))
+	}
+
+	--- A `multipart/form-data` upload. The handler keeps the bytes, never the filename.
+	@multipart
+	on POST("/photos") (body: PhotoForm) -> Effect[HttpResult[String]] by Visitor {
+		Ok("received \(body.photo.bytes.length()) bytes")
+	}
+}

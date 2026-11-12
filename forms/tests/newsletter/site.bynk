@@ -1,0 +1,68 @@
+---
+At the unit tier a handler gets its record directly, so these cases check what
+the handlers do with a decoded form. `Form.decode` and `Form.encode` are the
+`@form` mapping as a codec, so the cases that start from form text check the
+decoding rules themselves, field by field.
+---
+suite newsletter.site
+
+case "a sign-up is confirmed from the decoded form" {
+	let form = SignupForm {
+		email: "ada@example.com",
+		name: Some("Ada"),
+		topics: [News, Events],
+		weekly: true,
+	}
+	let r <- site.POST("/subscribe", form) by Visitor
+	expect r == Ok("Ada: 2 topics, weekly")
+}
+
+case "repeated checkboxes fill a list, and an empty input is None" {
+	let r: Result[SignupForm, DecodeError] = Form.decode(
+		"email=ada%40example.com&name=&topics=News&topics=Events&weekly=on"
+	)
+	let want = SignupForm {
+		email: "ada@example.com",
+		name: None,
+		topics: [News, Events],
+		weekly: true,
+	}
+	expect r == Ok(want)
+}
+
+case "fields the browser didn't send take their defaults" {
+	let r: Result[SignupForm, DecodeError] = Form.decode("email=ada%40example.com")
+	let want = SignupForm {
+		email: "ada@example.com",
+		name: None,
+		topics: [],
+		weekly: false,
+	}
+	expect r == Ok(want)
+}
+
+case "a field that breaks its refinement fails at that field" {
+	let r: Result[SignupForm, DecodeError] = Form.decode("email=nope")
+	expect r is Err(DecodeError { kind: "RefinementViolation", path: "$.email", .. })
+}
+
+case "Form.encode writes what @form reads" {
+	let form = SignupForm {
+		email: "ada@example.com",
+		name: None,
+		topics: [Releases],
+		weekly: false,
+	}
+	let back: Result[SignupForm, DecodeError] = Form.decode(Form.encode(form))
+	expect back == Ok(form)
+}
+
+case "an upload's file arrives as bytes" {
+	let photo = File {
+		filename: Some("cat.jpg"),
+		contentType: "image/jpeg",
+		bytes: Bytes.fromUtf8("meow"),
+	}
+	let r <- site.POST("/photos", PhotoForm { caption: None, photo: photo }) by Visitor
+	expect r == Ok("received 4 bytes")
+}

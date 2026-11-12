@@ -38,6 +38,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`rate-limiting`](rate-limiting/) | refusing a caller with `429`: the experimental `RateLimit` capability, `allow(key)`, tested with the in-memory limiter and `advance Clock` | [Rate-limit a route](https://bynk-lang.org/book/guides/effects-and-capabilities/rate-limit-a-route/) |
 | [`files-in-r2`](files-in-r2/) | R2 object storage: a write-once upload, a download, and a prefix listing, tested on the in-memory double | [Store files in R2](https://bynk-lang.org/book/guides/effects-and-capabilities/store-files-in-r2/) |
 | [`serve-a-page`](serve-a-page/) | keeping markup in an `.html` embed, filling it in, and serving it as a `Raw` HTML response | [Serve a page](https://bynk-lang.org/book/guides/entry-points/serve-a-page/) |
+| [`forms`](forms/) | `@form` and `@multipart` decode an HTML form post or an upload into a typed record at the boundary; `Form.decode` and `Form.encode` | [Form bodies](https://bynk-lang.org/book/reference/http/#form-bodies) |
 | [`oidc`](oidc/) | `Oidc` actors verify an identity provider's tokens against its public JWKS, and a handler reads the verified claims | [Authenticate with OIDC](https://bynk-lang.org/book/guides/actors/authenticate-with-oidc/) |
 | [`websocket`](websocket/) | accepting a WebSocket upgrade authenticated at the edge, handing the `Connection` to an agent, and broadcasting to a room, tested against a `TestConnection` | [Handle a WebSocket connection](https://bynk-lang.org/book/guides/entry-points/websocket/) |
 
