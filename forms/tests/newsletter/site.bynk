@@ -44,7 +44,10 @@ case "fields the browser didn't send take their defaults" {
 case "a field that breaks its refinement fails at that field" {
 	let r: Result[SignupForm, DecodeError] = Form.decode("email=nope")
 	match r {
-		Err(e) => expect e.kind == "RefinementViolation" && e.path == "$.email",
+		Err(e) => {
+			expect e.kind == "RefinementViolation"
+			expect e.path == "$.email"
+		},
 		Ok(_) => expect false,
 	}
 }

@@ -24,8 +24,9 @@ A form isn't JSON, and the rules follow what browsers actually send:
 - A group of checkboxes with one name repeats the key, which fills a `List`.
 - An unticked checkbox sends nothing at all, so a `Bool` needs a default
   (`weekly: Bool = false`).
-- Keys are flat: a field is a `String`, `Int`, `Bool`, `Decimal`, an enum or a
-  refined type over one, never a nested record.
+- Keys are flat: each value is a `String`, `Int`, `Bool`, `Decimal`, an enum or a
+  refined type over one (in an `Option` or a `List`, or a `File` in a multipart
+  form), never a nested record.
 
 ## Walkthrough
 
@@ -74,6 +75,11 @@ exact text a browser would:
 let r <- site.POST("/subscribe", Wire("email=nope"))
 expect r is Rejected(RefinementViolation(_))
 ```
+
+The same suite checks the router's other refusals: a JSON body sent to the form
+route is `Rejected(UnsupportedMediaType(_))`, a `415`, and a 512 KiB photo,
+under `maxBody` but over `maxFile`, is `Rejected(PayloadTooLarge(_))`, a `413`.
+Neither reaches a handler.
 
 A form post is a simple request in CORS terms, so another site's page can
 submit to this route. Nothing here authenticates the submitter: a real sign-up
