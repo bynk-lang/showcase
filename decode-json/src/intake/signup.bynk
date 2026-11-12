@@ -21,7 +21,7 @@ type Signup = {
 Decode untrusted text. The shape and the refinements are checked together, so an
 `Ok` carries a `Signup` that is already valid.
 ---
-fn parse(raw: String) -> Result[Signup, JsonError] {
+fn parse(raw: String) -> Result[Signup, DecodeError] {
 	Json.decode[Signup](raw)
 }
 

@@ -103,10 +103,10 @@ service api from http {
 }
 
 ---
-A row that did not fit `Book`. In `Err(Decode(e))`, `e` is a `JsonError`, so its
+A row that did not fit `Book`. In `Err(Decode(e))`, `e` is a `DecodeError`, so its
 fields say which column was wrong and why.
 ---
-fn rowReason(e: JsonError) -> String {
+fn rowReason(e: DecodeError) -> String {
 	"a books row did not fit Book: \(e.kind) at \(e.path): \(e.message)"
 }
 
