@@ -65,9 +65,7 @@ case "the table's CHECKs refuse a row Book would refuse" {
 }
 
 // The migration's table can't hold a row `Book` refuses, so this case swaps in
-// a loose one, as if the schema had drifted from the record. `bynk check`
-// prepares the batch's statements in order, so the `CREATE` is checked
-// against the schema the `DROP` leaves.
+// a loose one, as if the schema had drifted from the record.
 case "a row that does not fit Book is a Decode error, logged and hidden" {
 	let swapped <- Books.batch([
 		SqlStatement {
