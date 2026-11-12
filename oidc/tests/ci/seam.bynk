@@ -31,4 +31,13 @@ suite ci.release as system {
 		expect wrongIss is Rejected(Unauthorized)
 		expect wrongAud is Rejected(Unauthorized)
 	}
+
+	case "algorithm confusion and an unusable subject are refused" {
+		// `alg: none`, and an HS256 token keyed with the JWKS public key
+		let alg <- release.POST("/release") by WrongAlgorithm
+		// an empty `sub` and a missing one: `WorkloadId` is `NonEmpty`
+		let sub <- release.POST("/release") by NoSubject
+		expect alg is Rejected(Unauthorized)
+		expect sub is Rejected(Unauthorized)
+	}
 }

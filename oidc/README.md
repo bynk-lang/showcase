@@ -71,6 +71,17 @@ let wrongAud <- release.POST("/release") by WrongAudience // another `aud`
 expect forged is Rejected(Unauthorized)
 ```
 
+Two more cover what OIDC checks most often get wrong. `by WrongAlgorithm`
+presents a token with `alg: none` and one HS256-signed with the JWKS public key
+as the secret, and `by NoSubject` presents one with an empty `sub` and one with
+none, which couldn't become a `WorkloadId`:
+
+```bynk
+let alg <- release.POST("/release") by WrongAlgorithm
+let sub <- release.POST("/release") by NoSubject
+expect alg is Rejected(Unauthorized)
+```
+
 Each is a `401` before the handler runs. Only the test module holds the key, so
 nothing in the deployed Worker trusts it.
 
