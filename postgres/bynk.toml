@@ -1,0 +1,12 @@
+[project]
+name = "postgres"
+version = "0.1.0"
+
+# `Postgres` is experimental, so the project opts in to it.
+[unstable]
+allow = ["bynk.cloudflare.Postgres"]
+
+# Run each case's statements on PGlite, Postgres compiled to WebAssembly,
+# instead of stubbing every operation.
+[test]
+postgres = "pglite"

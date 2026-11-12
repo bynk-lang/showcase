@@ -1,0 +1,51 @@
+---
+With `[test] postgres = "pglite"`, `Main` is a real Postgres for each case,
+started from `schema.sql`, so the statements run for real: the `CHECK`, the
+foreign key and the transaction's rollback all happen in the database. A `stub`
+still answers first, which is how a case forces an outage.
+---
+suite depot.stock
+
+case "a fresh database has no stock" {
+	let r <- depot.GET("/stock") by Visitor
+	expect r == Ok([])
+}
+
+case "a restocked SKU reads back as an Item" {
+	let set <- depot.PUT("/stock/:sku", "tea", Restock { qty: 2 }) by Visitor
+	expect set is NoContent
+	let r <- depot.GET("/stock") by Visitor
+	expect r == Ok([Item { sku: "tea", qty: 2 }])
+}
+
+case "an order takes one from stock" {
+	let _ <- depot.PUT("/stock/:sku", "tea", Restock { qty: 1 }) by Visitor
+	let ordered <- depot.POST("/orders/:sku", "tea") by Visitor
+	expect ordered is Created(_)
+	let r <- depot.GET("/stock") by Visitor
+	expect r == Ok([Item { sku: "tea", qty: 0 }])
+}
+
+case "an order that would go below zero rolls back whole" {
+	let _ <- depot.PUT("/stock/:sku", "tea", Restock { qty: 1 }) by Visitor
+	let _ <- depot.POST("/orders/:sku", "tea") by Visitor
+	let again <- depot.POST("/orders/:sku", "tea") by Visitor
+	expect again is Conflict(_)
+	// The second order's row went in before the decrement failed, so a count of
+	// one means the transaction really rolled it back. `first` gives the row as
+	// JSON text.
+	// (`firstAs` in a case fails to build until bynk-lang/bynk#3398 is fixed.)
+	let orders <- Main.first("SELECT count(*)::int AS n FROM orders", [])
+	expect orders == Ok(Some("{\"n\":1}"))
+}
+
+case "an unknown SKU can't be ordered" {
+	let r <- depot.POST("/orders/:sku", "coffee") by Visitor
+	expect r is Conflict(_)
+}
+
+case "an outage is a plain 500, not a crash" {
+	stub Main.all(_, _) returns Err(PgConnection("ECONNREFUSED"))
+	let r <- depot.GET("/stock") by Visitor
+	expect r is ServerError(_)
+}
