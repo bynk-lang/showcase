@@ -36,7 +36,7 @@ case "a verified sender gets a reply" {
 // A message carrying one header, as a robot's mail would. Built in a function
 // because a `let`-bound `InboundEmail` literal that leaves `text` and `html` to
 // their defaults can't be passed to `triage` yet: its generated TypeScript
-// doesn't type-check.
+// doesn't type-check (https://github.com/bynk-lang/bynk/issues/3404).
 fn mailWithHeader(name: String, value: String) -> InboundEmail {
 	let none: Map[String, String] = Map.empty()
 	InboundEmail {
