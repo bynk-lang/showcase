@@ -1,0 +1,80 @@
+---
+A depot's stock, kept in a Postgres database the company already runs. The
+Worker reaches it through Cloudflare Hyperdrive. Statements are SQL literals
+with `$n` parameters, typed reads decode rows into records, and a transaction
+applies a list of statements all or none.
+---
+context depot.stock
+
+consumes bynk.cloudflare { Postgres, PgError, PgStatement, PgValue }
+
+--- The database, bound as `HYPERDRIVE_MAIN`.
+capability Main = Postgres
+
+type Sku = String where NonEmpty && MaxLength(32)
+
+type Qty = Int where InRange(0, 1_000_000)
+
+--- One row of `stock`. `select[Item]` writes the column list from these fields.
+type Item = {
+	sku: String,
+	qty: Int,
+}
+
+--- A new stock level.
+type Restock = {
+	qty: Qty,
+}
+
+service depot from http {
+	--- Everything in stock, by SKU.
+	on GET("/stock") () -> Effect[HttpResult[List[Item]]] by Visitor given Main {
+		let rows <- Main.select[Item]("FROM stock ORDER BY sku", [])
+		match rows {
+			Ok(items) => Ok(items),
+			Err(_) => ServerError("stock is unavailable"),
+		}
+	}
+
+	--- Set a SKU's level, adding it if it's new.
+	on PUT("/stock/:sku") (
+		sku: Sku,
+		body: Restock
+	) -> Effect[HttpResult[()]] by Visitor given Main {
+		let ran <- Main.run(
+			"""sql
+			INSERT INTO stock (sku, qty) VALUES ($1, $2)
+			ON CONFLICT (sku) DO UPDATE SET qty = excluded.qty
+			""",
+			[PgText(sku), PgInteger(body.qty)]
+		)
+		match ran {
+			Ok(_) => NoContent,
+			Err(_) => ServerError("stock is unavailable"),
+		}
+	}
+
+	---
+	Order one of a SKU. Taking it from stock and recording the order happen
+	together or not at all. The `CHECK (qty >= 0)` refuses a decrement below
+	zero, and the foreign key refuses an unknown SKU; either way the
+	transaction rolls back and nothing is recorded.
+	---
+	on POST("/orders/:sku") (sku: Sku) -> Effect[HttpResult[String]] by Visitor given Main {
+		let done <- Main.transaction([
+			PgStatement {
+				sql: "UPDATE stock SET qty = qty - 1 WHERE sku = $1",
+				params: [PgText(sku)],
+			},
+			PgStatement {
+				sql: "INSERT INTO orders (sku) VALUES ($1)",
+				params: [PgText(sku)],
+			},
+		])
+		match done {
+			Ok(_) => Created("ordered"),
+			Err(PgConstraint(_, _)) => Conflict("not available"),
+			Err(_) => ServerError("orders are unavailable"),
+		}
+	}
+}
