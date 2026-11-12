@@ -40,13 +40,17 @@ suite intake.signup {
 	}
 
 	case "YAML gets the same refinements and paths" {
-		let r = fromYaml("name: Ada\nage: 5\n")
-		expect r is Err(DecodeError { kind: "RefinementViolation", path: "$.age", .. })
+		match fromYaml("name: Ada\nage: 5\n") {
+			Err(e) => expect e.kind == "RefinementViolation" && e.path == "$.age",
+			Ok(_) => expect false,
+		}
 	}
 
 	case "YAML that could smuggle structure is refused, not followed" {
-		let r = fromYaml("name: &n Ada\nage: 36\n")
-		expect r is Err(DecodeError { kind: "UnsupportedAnchor", .. })
+		match fromYaml("name: &n Ada\nage: 36\n") {
+			Err(e) => expect e.kind == "UnsupportedAnchor",
+			Ok(_) => expect false,
+		}
 	}
 
 	case "encodePlain writes None as null and decodes back" {
