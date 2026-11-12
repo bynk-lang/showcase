@@ -40,11 +40,7 @@ service site from http {
 	defaults: `Secure`, `HttpOnly`, `SameSite=Lax` and `Path=/`.
 	---
 	on POST("/theme/dark") () -> Effect[HttpResult[String]] by Visitor {
-		Ok("dark").withCookie(Cookie {
-			name: "theme",
-			value: "Dark",
-			maxAge: Some(365.days),
-		})
+		Ok("dark").withCookie(Cookie { name: "theme", value: "Dark", maxAge: Some(365.days) })
 	}
 
 	--- Forget the choice: the same cookie again, empty and already expired.
@@ -55,9 +51,6 @@ service site from http {
 	--- Count this visit, and send the new count back to be remembered.
 	on GET("/visit") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
 		let n = cookies.visits + 1
-		Ok("visit \(n)").withCookie(Cookie {
-			name: "__Host-visits",
-			value: "\(n)",
-		})
+		Ok("visit \(n)").withCookie(Cookie { name: "__Host-visits", value: "\(n)" })
 	}
 }

@@ -43,10 +43,7 @@ cookies on the way out:
 ```bynk
 on GET("/visit") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
 	let n = cookies.visits + 1
-	Ok("visit \(n)").withCookie(Cookie {
-		name: "__Host-visits",
-		value: "\(n)",
-	})
+	Ok("visit \(n)").withCookie(Cookie { name: "__Host-visits", value: "\(n)" })
 }
 ```
 
