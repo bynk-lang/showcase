@@ -73,16 +73,20 @@ expect forged is Rejected(Unauthorized)
 
 Two more cover what OIDC checks most often get wrong. `by WrongAlgorithm`
 presents a token with `alg: none` and one HS256-signed with the JWKS public key
-as the secret, and `by NoSubject` presents one with an empty `sub` and one with
-none, which couldn't become a `WorkloadId`:
+as the secret. `by NoSubject` presents one with an empty `sub`, which couldn't
+become a `NonEmpty` `WorkloadId`, and one with no `sub` at all, which carries no
+identity. Each principal sends both its tokens, and the call is
+`Rejected(Unauthorized)` only if both are refused; if the seam admits either,
+the case sees that outcome and fails:
 
 ```bynk
 let alg <- release.POST("/release") by WrongAlgorithm
 let sub <- release.POST("/release") by NoSubject
 expect alg is Rejected(Unauthorized)
+expect sub is Rejected(Unauthorized)
 ```
 
-Each is a `401` before the handler runs. Only the test module holds the key, so
+Each token is a `401` before the handler runs. Only the test module holds the key, so
 nothing in the deployed Worker trusts it.
 
 ## Run it
