@@ -53,6 +53,9 @@ suite intake.signup {
 	// core schema): `1234` is an integer, so a `Name` refuses it where JSON's
 	// `"1234"` would decode. Quote it and it's a string. `no` stays a string.
 	case "a YAML scalar is typed before the decode sees it" {
+		expect fromYaml("name: \"1234\"\nage: 36\n") is Ok(_)
+		let r = fromYaml("name: Ada\nage: 36\nnote: no\n")
+		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("no") })
 		match fromYaml("name: 1234\nage: 36\n") {
 			Err(e) => {
 				expect e.kind == "StructuralMismatch"
@@ -60,9 +63,6 @@ suite intake.signup {
 			},
 			Ok(_) => expect false,
 		}
-		expect fromYaml("name: \"1234\"\nage: 36\n") is Ok(_)
-		let r = fromYaml("name: Ada\nage: 36\nnote: no\n")
-		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("no") })
 	}
 
 	case "YAML that could smuggle structure is refused, not followed" {
