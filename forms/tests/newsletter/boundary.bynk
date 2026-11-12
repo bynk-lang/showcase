@@ -1,0 +1,46 @@
+// At `system` the router decodes the body, so a `Wire(…)` case sends the exact
+// text a browser would and sees what the boundary makes of it: a decoded record
+// reaches the handler (`Handled`), or a `400` is sent before it runs (`Rejected`).
+suite newsletter.site as system {
+	// `s` doubled `times` times: 19 doublings of one byte is 524,288 bytes.
+	fn doubled(s: String, times: Int) -> String {
+		if times == 0 { s } else { doubled("\(s)\(s)", times - 1) }
+	}
+
+	case "a browser's sign-up reaches the handler decoded" {
+		let r <- site.POST("/subscribe", Wire("email=ada%40example.com&name=&weekly=on"))
+		expect r is Handled(Ok("ada@example.com: 0 topics, weekly"))
+	}
+
+	case "a bad address is refused before the handler runs" {
+		let r <- site.POST("/subscribe", Wire("email=nope"))
+		expect r is Rejected(RefinementViolation(_))
+	}
+
+	// A `@form` route reads only form bodies. The trailing headers replace the
+	// driver's own `Content-Type`.
+	case "a body that isn't a form is a 415" {
+		let r <- site.POST(
+			"/subscribe",
+			Wire("{}"),
+			RequestHeaders.of(["Content-Type: application/json"])
+		)
+		expect r is Rejected(UnsupportedMediaType(_))
+	}
+
+	// A multipart `Wire(…)` body is framed with the boundary `bynk-boundary`.
+	case "a browser's upload reaches the handler as a File" {
+		let body = "--bynk-boundary\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"cat.jpg\"\r\nContent-Type: image/jpeg\r\n\r\nmeow\r\n--bynk-boundary--\r\n"
+		let r <- site.POST("/photos", Wire(body))
+		expect r is Handled(Ok("received 4 bytes"))
+	}
+
+	// Under `maxBody` but over `maxFile`: the router counts the part as it reads
+	// it and answers `413` before the handler runs.
+	case "a file over maxFile is refused before the handler runs" {
+		let big = doubled("x", 19)
+		let body = "--bynk-boundary\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"big.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n\(big)\r\n--bynk-boundary--\r\n"
+		let r <- site.POST("/photos", Wire(body))
+		expect r is Rejected(PayloadTooLarge(_))
+	}
+}
