@@ -59,7 +59,8 @@ case "the room broadcasts to every connection it holds" {
 }
 
 // `conns.remove` closes the connection it held: the server closes it, so
-// `closed()` reports it, and nothing more is sent to it.
+// `closed()` reports it, and nothing more is sent to it. The member who stayed
+// is still open and still hears the post.
 case "a member who leaves is closed and hears nothing more" {
 	let ada = TestConnection[ServerFrame]()
 	let grace = TestConnection[ServerFrame]()
@@ -70,4 +71,6 @@ case "a member who leaves is closed and hears nothing more" {
 	let _ <- room.post(UserId.unsafe("ada"), "tea?")
 	expect grace.sent() == []
 	expect grace.closed()
+	expect ada.sent() == [said("tea?")]
+	expect !ada.closed()
 }
