@@ -49,7 +49,10 @@ fn confirmation(form: SignupForm) -> String {
 service site from http {
 	// A public form should have a cap. A multipart route must have one, since
 	// the whole body is held in memory while its parts are read.
-	limits { maxBody: 1_000_000, maxFile: 500_000 }
+	limits {
+		maxBody: 1_000_000,
+		maxFile: 500_000,
+	}
 
 	--- An `application/x-www-form-urlencoded` post; anything else is a `415`.
 	@form

@@ -45,7 +45,10 @@ The handlers say which wire format their body has. `limits { }` caps the body
 and each file part, which a `@multipart` route requires:
 
 ```bynk
-limits { maxBody: 1_000_000, maxFile: 500_000 }
+limits {
+	maxBody: 1_000_000,
+	maxFile: 500_000,
+}
 
 @form
 on POST("/subscribe") (body: SignupForm) -> Effect[HttpResult[String]] by Visitor {
