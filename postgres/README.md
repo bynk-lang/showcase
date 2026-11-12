@@ -52,25 +52,28 @@ An order is two statements that must happen together:
 ```bynk
 let done <- Main.transaction([
 	PgStatement {
-		sql: "UPDATE stock SET qty = qty - 1 WHERE sku = $1",
+		sql: "INSERT INTO orders (sku) VALUES ($1)",
 		params: [PgText(sku)],
 	},
 	PgStatement {
-		sql: "INSERT INTO orders (sku) VALUES ($1)",
+		sql: "UPDATE stock SET qty = qty - 1 WHERE sku = $1",
 		params: [PgText(sku)],
 	},
 ])
 ```
 
-If the decrement would go below zero, or the SKU doesn't exist, that statement
-fails with `PgConstraint`, the transaction rolls back, and the handler answers
-`409`.
+The order goes in first, so a refused decrement has something to undo. If the
+decrement would go below zero, the `CHECK` refuses it and the transaction rolls
+the order back. If the SKU doesn't exist, the order's foreign key refuses it
+straight away; without that key, an unknown SKU would be "ordered", because an
+`UPDATE` that matches no rows succeeds. Either way the statement fails with
+`PgConstraint`, nothing is recorded, and the handler answers `409`.
 
 [`tests/depot/stock.bynk`](tests/depot/stock.bynk) runs on PGlite: each case
 starts from an empty database with `schema.sql` applied, so the `CHECK`, the
 foreign key and the rollback all happen for real. One case counts the orders
 after a refused second order, calling `Main.first` directly, and finds just
-the first. A `stub` still answers before the
+the first: the second's row was inserted and then rolled back. A `stub` still answers before the
 database, which is how the last case forces a `PgConnection` outage.
 
 ## Run it

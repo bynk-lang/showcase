@@ -31,7 +31,9 @@ case "an order that would go below zero rolls back whole" {
 	let _ <- depot.POST("/orders/:sku", "tea") by Visitor
 	let again <- depot.POST("/orders/:sku", "tea") by Visitor
 	expect again is Conflict(_)
-	// `first` gives the row as JSON text. Only the first order was recorded.
+	// The second order's row went in before the decrement failed, so a count of
+	// one means the transaction really rolled it back. `first` gives the row as
+	// JSON text.
 	// (`firstAs` in a case fails to build until bynk-lang/bynk#3398 is fixed.)
 	let orders <- Main.first("SELECT count(*)::int AS n FROM orders", [])
 	expect orders == Ok(Some("{\"n\":1}"))

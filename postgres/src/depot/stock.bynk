@@ -55,19 +55,20 @@ service depot from http {
 	}
 
 	---
-	Order one of a SKU. Taking it from stock and recording the order happen
-	together or not at all. The `CHECK (qty >= 0)` refuses a decrement below
-	zero, and the foreign key refuses an unknown SKU; either way the
-	transaction rolls back and nothing is recorded.
+	Order one of a SKU. Recording the order and taking it from stock happen
+	together or not at all. The order goes in first, so a refused decrement has
+	something to undo: the `CHECK (qty >= 0)` refuses one below zero, and the
+	transaction rolls the order back. An unknown SKU is refused sooner, by the
+	order's foreign key. Either way nothing is recorded.
 	---
 	on POST("/orders/:sku") (sku: Sku) -> Effect[HttpResult[String]] by Visitor given Main {
 		let done <- Main.transaction([
 			PgStatement {
-				sql: "UPDATE stock SET qty = qty - 1 WHERE sku = $1",
+				sql: "INSERT INTO orders (sku) VALUES ($1)",
 				params: [PgText(sku)],
 			},
 			PgStatement {
-				sql: "INSERT INTO orders (sku) VALUES ($1)",
+				sql: "UPDATE stock SET qty = qty - 1 WHERE sku = $1",
 				params: [PgText(sku)],
 			},
 		])
