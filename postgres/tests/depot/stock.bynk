@@ -6,11 +6,6 @@ still answers first, which is how a case forces an outage.
 ---
 suite depot.stock
 
---- A count read back with `firstAs`, a row type only this suite needs.
-type Counted = {
-	n: Int,
-}
-
 case "a fresh database has no stock" {
 	let r <- depot.GET("/stock") by Visitor
 	expect r == Ok([])
@@ -36,8 +31,9 @@ case "an order that would go below zero rolls back whole" {
 	let _ <- depot.POST("/orders/:sku", "tea") by Visitor
 	let again <- depot.POST("/orders/:sku", "tea") by Visitor
 	expect again is Conflict(_)
-	let orders <- Main.firstAs[Counted]("FROM (SELECT count(*) AS n FROM orders) AS c", [])
-	expect orders == Ok(Some(Counted { n: 1 }))
+	// `first` gives the row as JSON text. Only the first order was recorded.
+	let orders <- Main.first("SELECT count(*)::int AS n FROM orders", [])
+	expect orders == Ok(Some("{\"n\":1}"))
 }
 
 case "an unknown SKU can't be ordered" {

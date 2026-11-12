@@ -69,8 +69,8 @@ fails with `PgConstraint`, the transaction rolls back, and the handler answers
 [`tests/depot/stock.bynk`](tests/depot/stock.bynk) runs on PGlite: each case
 starts from an empty database with `schema.sql` applied, so the `CHECK`, the
 foreign key and the rollback all happen for real. One case counts the orders
-after a refused second order, through `firstAs[Counted]` with a row type only
-the suite declares, and finds just the first. A `stub` still answers before the
+after a refused second order, calling `Main.first` directly, and finds just
+the first. A `stub` still answers before the
 database, which is how the last case forces a `PgConnection` outage.
 
 ## Run it
