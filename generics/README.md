@@ -80,9 +80,27 @@ automatic rule from setting `Urgent`. `Team` is a record of `String`s, so it is
 a `Key` with nothing to declare, and `countBy(ts, (t) => t.team)` returns a
 `Map[Team, Int]`.
 
+A generic type may refer to itself. `Chain[T]` in `generic.bynk` is an
+escalation chain, each step holding a `T` and an optional rest:
+
+```bynk
+type Chain[T] = {
+	head: T,
+	next: Option[Chain[T]],
+}
+```
+
+It works anywhere inside the unit. It's refused only where a value crosses a
+boundary, a handler signature, a `store` field or an event, because a
+recursive generic has no codec yet (`bynk.generics.recursive_generic_at_boundary`).
+Walking it is a self call in tail position, by name in `stepsFrom` and by
+receiver in `last`, which Bynk runs as a loop, so a long chain doesn't grow the
+stack. A test walks a 100,000-step chain both ways.
+
 **`tests/triage/`** checks the edges: an empty queue has no next ticket, a later
 field only breaks ties, `clamp` holds across generated ranges (a `property`),
-and a map lookup by a `Team` built anew finds the same key.
+a map lookup by a `Team` built anew finds the same key, and a `Chain` reports
+its length and last step.
 
 ## Run it
 
