@@ -32,6 +32,7 @@ case "an order that would go below zero rolls back whole" {
 	let again <- depot.POST("/orders/:sku", "tea") by Visitor
 	expect again is Conflict(_)
 	// `first` gives the row as JSON text. Only the first order was recorded.
+	// (`firstAs` in a case fails to build until bynk-lang/bynk#3398 is fixed.)
 	let orders <- Main.first("SELECT count(*)::int AS n FROM orders", [])
 	expect orders == Ok(Some("{\"n\":1}"))
 }
