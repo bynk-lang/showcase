@@ -25,6 +25,8 @@ case "resetting clears the theme cookie" {
 	let r <- site.POST("/theme/reset") by Visitor
 	expect r.cookies().map((c) => c.name) == ["theme"]
 	expect r.cookies().map((c) => c.value) == [""]
+	// `Max-Age=0` is what makes the browser forget it, not the empty value.
+	expect r.cookies().all((c) => c.maxAge == Some(0.seconds))
 }
 
 case "a visit counts on from the cookie" {
@@ -32,4 +34,11 @@ case "a visit counts on from the cookie" {
 	// `is`, not `==`: the result also carries the cookie it sets.
 	expect r is Ok("visit 3")
 	expect r.cookies().map((c) => c.value) == ["3"]
+}
+
+// A browser drops a `__Host-` cookie that isn't `Secure`, has a `Domain`, or has
+// a `Path` other than `/`, and the count would silently never go up.
+case "the visit cookie meets the __Host- rules" {
+	let r <- site.GET("/visit", Prefs { theme: Light, visits: 0 }) by Visitor
+	expect r.cookies().all((c) => c.secure && c.path == "/" && c.domain == None)
 }

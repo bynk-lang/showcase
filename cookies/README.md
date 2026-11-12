@@ -21,6 +21,13 @@ which is how a browser forgets one.
 A cookie arrives from the client, so it's input like any other, never proof of
 who's asking. That's why `visits` is only a count.
 
+Strict decoding has a cost to plan for: a stored cookie that no longer decodes
+refuses every route that reads it, for as long as the browser keeps it. Rename
+`Dark` and everyone who chose dark mode gets a `400` on `/theme` and `/visit`
+until the year-long cookie expires. Treat a cookie's type like a stored schema,
+and change it compatibly: add variants and defaulted fields, don't rename or
+remove them.
+
 ## Walkthrough
 
 [`src/prefs/site.bynk`](src/prefs/site.bynk) declares the cookies it reads:
