@@ -71,7 +71,10 @@ A YAML refusal is a `DecodeError` too, with its own `kind`, such as
 failure: malformed JSON, a missing field or wrong base type, and an empty name or
 out-of-range age. It also checks that the error path names `$.age`, and that
 `encodePlain` output decodes back. The YAML cases decode the same `Signup`, hit
-the same refinement at the same path, and show an anchor refused.
+the same refinement at the same path, and show an anchor refused. One shows
+where YAML differs: a plain scalar is typed by its shape first, so `name: 1234`
+is an integer and fails at `$.name`. Quote strings that look like numbers.
+Under the 1.2 core schema `no`, `yes` and `on` stay strings.
 
 ## Run it
 

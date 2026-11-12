@@ -41,9 +41,28 @@ suite intake.signup {
 
 	case "YAML gets the same refinements and paths" {
 		match fromYaml("name: Ada\nage: 5\n") {
-			Err(e) => expect e.kind == "RefinementViolation" && e.path == "$.age",
+			Err(e) => {
+				expect e.kind == "RefinementViolation"
+				expect e.path == "$.age"
+			},
 			Ok(_) => expect false,
 		}
+	}
+
+	// A plain scalar is typed by its shape before the decode sees it (the 1.2
+	// core schema): `1234` is an integer, so a `Name` refuses it where JSON's
+	// `"1234"` would decode. Quote it and it's a string. `no` stays a string.
+	case "a YAML scalar is typed before the decode sees it" {
+		match fromYaml("name: 1234\nage: 36\n") {
+			Err(e) => {
+				expect e.kind == "StructuralMismatch"
+				expect e.path == "$.name"
+			},
+			Ok(_) => expect false,
+		}
+		expect fromYaml("name: \"1234\"\nage: 36\n") is Ok(_)
+		let r = fromYaml("name: Ada\nage: 36\nnote: no\n")
+		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("no") })
 	}
 
 	case "YAML that could smuggle structure is refused, not followed" {
