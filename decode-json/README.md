@@ -7,9 +7,9 @@ note.
 ## The idea
 
 JSON from outside is just text. `Json.decode[Signup](raw)` checks it against the
-type and returns `Result[Signup, JsonError]`. The check covers the shape (fields
+type and returns `Result[Signup, DecodeError]`. The check covers the shape (fields
 and base types) and every refinement, so an `Ok` value is already valid and no
-separate `.of` step is needed. A failure is a `JsonError` with three `String`
+separate `.of` step is needed. A failure is a `DecodeError` with three `String`
 fields: `kind` (`Malformed`, `StructuralMismatch` or `RefinementViolation`), `path`
 (such as `$.age`) and `message`.
 
@@ -32,12 +32,12 @@ type Signup = {
 Decoding is one call. The type argument is required:
 
 ```bynk
-fn parse(raw: String) -> Result[Signup, JsonError] {
+fn parse(raw: String) -> Result[Signup, DecodeError] {
 	Json.decode[Signup](raw)
 }
 ```
 
-`JsonError` has no string form, so a report interpolates its fields:
+`DecodeError` has no string form, so a report interpolates its fields:
 
 ```bynk
 Err(e) => "\(e.kind) at \(e.path): \(e.message)"

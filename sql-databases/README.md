@@ -36,7 +36,7 @@ Four rules keep the SQL safe and the rows typed:
   `Result[SqlRun, SqlError]`, where `Constraint` is a broken key or `CHECK`
   that a handler can answer. A typed read gives `SqlReadError`: `Sql(e)` when
   the statement failed, `Decode(e)` when a row didn't fit the record. In each
-  arm `e` has its own type (`SqlError` or `JsonError`), so the handler can say
+  arm `e` has its own type (`SqlError` or `DecodeError`), so the handler can say
   exactly what went wrong.
 
 The record and the table should agree, and the database can hold up its end.
@@ -79,7 +79,7 @@ match added {
 
 The unread list reads every matching row into a `List[Book]`. The statement
 starts at `FROM`. In the error arms, `e` is a `SqlError` in one and a
-`JsonError` in the other, and each goes to a function typed at it:
+`DecodeError` in the other, and each goes to a function typed at it:
 
 ```bynk
 let rows <- Books.select[Book](
