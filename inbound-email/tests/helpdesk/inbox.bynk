@@ -33,22 +33,25 @@ case "a verified sender gets a reply" {
 	expect triage(mailAbout("where is my parcel?"), true) is Reply(_)
 }
 
-case "an auto-reply is never answered, even from a verified sender" {
+// A message carrying one header, as a robot's mail would. Built in a function
+// because a `let`-bound `InboundEmail` literal that leaves `text` and `html` to
+// their defaults can't be passed to `triage` yet: its generated TypeScript
+// doesn't type-check.
+fn mailWithHeader(name: String, value: String) -> InboundEmail {
 	let none: Map[String, String] = Map.empty()
-	let ooo = InboundEmail {
-		from: "ada@example.org",
+	InboundEmail {
+		from: "robot@example.org",
 		to: "support@shop.example",
-		subject: "Out of office",
-		headers: none.insert("auto-submitted", "auto-replied"),
+		subject: "Automatic reply",
+		headers: none.insert(name, value),
 	}
-	expect triage(ooo, true) is Accept
-	let digest = InboundEmail {
-		from: "list@example.org",
-		to: "support@shop.example",
-		subject: "Weekly digest",
-		headers: none.insert("precedence", "bulk"),
-	}
-	expect triage(digest, true) is Accept
+}
+
+case "an auto-reply is never answered, even from a verified sender" {
+	expect triage(mailWithHeader("auto-submitted", "auto-replied"), true) is Accept
+	expect triage(mailWithHeader("precedence", "bulk"), true) is Accept
+	expect triage(mailWithHeader("list-id", "<news.example.org>"), true) is Accept
+	expect triage(mailWithHeader("auto-submitted", "no"), true) is Reply(_)
 }
 
 case "an unverified sender never earns a reply" {
