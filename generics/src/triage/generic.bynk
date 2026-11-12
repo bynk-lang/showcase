@@ -77,3 +77,40 @@ fn Sorted.insert(self, x: T) -> Sorted[T] {
 fn Sorted.first(self) -> Option[T] {
 	self.items.get(0)
 }
+
+---
+Who a ticket goes to, then who after them. The type refers to itself through
+`next`, so a chain can be any length, and it is generic in what each step
+holds. A recursive generic type is ordinary inside a unit; it is refused only
+where a value would cross a boundary (a handler signature, a `store` field, an
+event), because its codec doesn't exist yet
+(`bynk.generics.recursive_generic_at_boundary`).
+---
+type Chain[T] = {
+	head: T,
+	next: Option[Chain[T]],
+}
+
+--- How many steps the chain has, at least one.
+fn Chain.length(self) -> Int {
+	stepsFrom(self, 1)
+}
+
+---
+Counts on from `n`. The self call is the last thing each step does, a tail
+call, so it runs as a loop: a long chain doesn't grow the stack.
+---
+fn stepsFrom[T](c: Chain[T], n: Int) -> Int {
+	match c.next {
+		Some(rest) => stepsFrom(rest, n + 1),
+		None => n,
+	}
+}
+
+--- The step a ticket ends up with once every earlier one has passed it on.
+fn Chain.last(self) -> T {
+	match self.next {
+		Some(rest) => rest.last(),
+		None => self.head,
+	}
+}
