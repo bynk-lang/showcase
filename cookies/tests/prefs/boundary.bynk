@@ -1,0 +1,31 @@
+// At `system` the router parses the `Cookie` header and decodes it into `Prefs`
+// before the handler runs. A `Wire(…)` argument is the header text itself, so a
+// case sends exactly what a browser would.
+suite prefs.site as system {
+	case "a theme cookie reaches the handler decoded" {
+		let r <- site.GET("/theme", Wire("theme=Dark"))
+		expect r is Handled(Ok("dark"))
+	}
+
+	case "no cookie at all takes the default" {
+		let r <- site.GET("/theme", Wire(""))
+		expect r is Handled(Ok("light"))
+	}
+
+	case "cookies Prefs doesn't name are ignored" {
+		let r <- site.GET("/theme", Wire("_ga=GA1.1.123; theme=Dark"))
+		expect r is Handled(Ok("dark"))
+	}
+
+	case "a value Prefs can't hold is refused before the handler runs" {
+		let r <- site.GET("/theme", Wire("theme=Purple"))
+		expect r is Rejected(_)
+	}
+
+	case "the visit count is read from its __Host- name" {
+		let counted <- site.GET("/visit", Wire("__Host-visits=4"))
+		let unprefixed <- site.GET("/visit", Wire("visits=4"))
+		expect counted is Handled(Ok("visit 5"))
+		expect unprefixed is Handled(Ok("visit 1"))
+	}
+}

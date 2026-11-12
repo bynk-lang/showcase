@@ -66,7 +66,9 @@ Everything lives in [`src/chat/room.bynk`](src/chat/room.bynk).
    ```
 
    `tc.connection()` hands over the owned `Connection` itself, so a case can
-   drive the `Room` agent without the gateway.
+   drive the `Room` agent without the gateway. That case also checks the
+   ownership rule: after `leave`, `tc.closed()` is `true`, because `remove`
+   closed the connection the room held.
 
 ## Run it
 

@@ -1,0 +1,56 @@
+---
+A site that remembers two things about a visitor in cookies: the theme they
+picked, and how many times they've been. Cookies are read through a typed
+record, checked at the boundary like a query or a body, and set with safe
+defaults.
+---
+context prefs.site
+
+consumes bynk { Cookie }
+
+type Theme = enum { Light, Dark }
+
+---
+The cookies a request carries, decoded and validated before a handler runs.
+`theme` is absent on a first visit, so it has a default. The visit count lives
+in a `__Host-` cookie, which only this exact host can set: a hyphen can't be
+part of a field name, so `@name` gives the field the key the browser sends.
+---
+type Prefs = {
+	theme: Theme = Light,
+	@name("__Host-visits") visits: Int = 0,
+}
+
+--- How a theme reads in a response and in its cookie.
+fn label(t: Theme) -> String {
+	match t {
+		Light => "light",
+		Dark => "dark",
+	}
+}
+
+service site from http {
+	--- The theme the visitor picked, or `light`.
+	on GET("/theme") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
+		Ok(label(cookies.theme))
+	}
+
+	---
+	Pick dark mode for a year. The cookie's other attributes take the safe
+	defaults: `Secure`, `HttpOnly`, `SameSite=Lax` and `Path=/`.
+	---
+	on POST("/theme/dark") () -> Effect[HttpResult[String]] by Visitor {
+		Ok("dark").withCookie(Cookie { name: "theme", value: "Dark", maxAge: Some(365.days) })
+	}
+
+	--- Forget the choice: the same cookie again, empty and already expired.
+	on POST("/theme/reset") () -> Effect[HttpResult[()]] by Visitor {
+		NoContent.clearCookie(Cookie { name: "theme", value: "" })
+	}
+
+	--- Count this visit, and send the new count back to be remembered.
+	on GET("/visit") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
+		let n = cookies.visits + 1
+		Ok("visit \(n)").withCookie(Cookie { name: "__Host-visits", value: "\(n)" })
+	}
+}

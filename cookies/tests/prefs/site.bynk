@@ -1,0 +1,44 @@
+---
+At the unit tier a handler gets its `cookies` record directly. `cookies()`
+reads the cookies a result sets, so a case checks what would go back to the
+browser.
+---
+suite prefs.site
+
+case "the theme comes from the cookie" {
+	let r <- site.GET("/theme", Prefs { theme: Dark, visits: 0 }) by Visitor
+	expect r == Ok("dark")
+}
+
+case "choosing dark mode sets the theme cookie" {
+	let r <- site.POST("/theme/dark") by Visitor
+	expect r.cookies().map((c) => c.name) == ["theme"]
+	expect r.cookies().map((c) => c.value) == ["Dark"]
+}
+
+case "the theme cookie is safe by default" {
+	let r <- site.POST("/theme/dark") by Visitor
+	expect r.cookies().all((c) => c.secure && c.httpOnly)
+}
+
+case "resetting clears the theme cookie" {
+	let r <- site.POST("/theme/reset") by Visitor
+	expect r.cookies().map((c) => c.name) == ["theme"]
+	expect r.cookies().map((c) => c.value) == [""]
+	// `Max-Age=0` is what makes the browser forget it, not the empty value.
+	expect r.cookies().all((c) => c.maxAge == Some(0.seconds))
+}
+
+case "a visit counts on from the cookie" {
+	let r <- site.GET("/visit", Prefs { theme: Light, visits: 2 }) by Visitor
+	// `is`, not `==`: the result also carries the cookie it sets.
+	expect r is Ok("visit 3")
+	expect r.cookies().map((c) => c.value) == ["3"]
+}
+
+// A browser drops a `__Host-` cookie that isn't `Secure`, has a `Domain`, or has
+// a `Path` other than `/`, and the count would silently never go up.
+case "the visit cookie meets the __Host- rules" {
+	let r <- site.GET("/visit", Prefs { theme: Light, visits: 0 }) by Visitor
+	expect r.cookies().all((c) => c.secure && c.path == "/" && c.domain == None)
+}
