@@ -1,0 +1,47 @@
+---
+A support desk's mailbox. Each message is decided, not processed: the handler
+returns a verdict (accept, reject, forward or reply) and the runtime carries
+it out. Inbound email is experimental.
+---
+context helpdesk.inbox
+
+consumes bynk.cloudflare { InboundEmail, EmailVerdict, EmailReply, DmarcVerdict }
+
+--- Anything larger is refused unread: there's no attachment we want that big.
+const MaxSize: Int = 10_000_000
+
+---
+What happens to a message to support. Pure, so a case can try every branch,
+including a sender whose domain passed DMARC, which a suite can't produce.
+
+`mail.from` is the envelope sender, which anyone can write, so it decides
+nothing. `dmarc` is Cloudflare's verdict on whether the sender's domain vouched
+for the message, and only that earns an automatic reply.
+---
+fn triage(mail: InboundEmail, dmarc: DmarcVerdict) -> EmailVerdict {
+	if mail.size > MaxSize {
+		Reject("message too large")
+	} else if mail.subject.contains("refund") {
+		Forward("billing@shop.example")
+	} else if dmarc == DmarcPass {
+		Reply(EmailReply { text: Some("Thanks, we have your message and will be in touch.") })
+	} else {
+		Accept
+	}
+}
+
+service support from email("support@shop.example") {
+	on message(mail: InboundEmail) -> Effect[EmailVerdict] by s: Sender {
+		triage(mail, s.identity.dmarc)
+	}
+}
+
+---
+Every other address on the domain. A named address beats the catch-all, so
+mail to support never lands here.
+---
+service nobody from email("*@shop.example") {
+	on message(mail: InboundEmail) -> Effect[EmailVerdict] {
+		Reject("no such mailbox")
+	}
+}

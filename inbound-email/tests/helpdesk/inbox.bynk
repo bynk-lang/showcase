@@ -1,0 +1,53 @@
+---
+`support.message(…)` runs the handler on a message built in the case, with no
+Worker and no mail. Every `InboundEmail` field after `to` has a default, so a
+case writes only what it's about. In a suite the sender's DMARC verdict is
+`DmarcNone`, so the reply branch is tested through `triage` directly.
+---
+suite helpdesk.inbox
+
+fn mailAbout(subject: String) -> InboundEmail {
+	InboundEmail {
+		from: "ada@example.org",
+		to: "support@shop.example",
+		subject: subject,
+	}
+}
+
+case "a refund request goes to billing" {
+	let r <- support.message(mailAbout("refund for order 1042"))
+	expect r is Forward("billing@shop.example")
+}
+
+case "an unverified sender's question is accepted, not answered" {
+	let r <- support.message(mailAbout("where is my parcel?"))
+	expect r is Accept
+}
+
+case "a verified sender gets a reply" {
+	expect triage(mailAbout("where is my parcel?"), DmarcPass) is Reply(_)
+}
+
+case "a failed DMARC check never earns a reply" {
+	expect triage(mailAbout("where is my parcel?"), DmarcFail) is Accept
+}
+
+case "an oversized message is refused unread" {
+	let huge = InboundEmail {
+		from: "ada@example.org",
+		to: "support@shop.example",
+		subject: "photos",
+		size: 20_000_000,
+	}
+	let r <- support.message(huge)
+	expect r is Reject(_)
+}
+
+case "mail to any other address is refused" {
+	let r <- nobody.message(InboundEmail {
+		from: "ada@example.org",
+		to: "sales@shop.example",
+		subject: "hello",
+	})
+	expect r is Reject("no such mailbox")
+}
