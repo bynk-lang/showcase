@@ -29,6 +29,7 @@ case "resetting clears the theme cookie" {
 
 case "a visit counts on from the cookie" {
 	let r <- site.GET("/visit", Prefs { theme: Light, visits: 2 }) by Visitor
-	expect r == Ok("visit 3")
+	// `is`, not `==`: the result also carries the cookie it sets.
+	expect r is Ok("visit 3")
 	expect r.cookies().map((c) => c.value) == ["3"]
 }
