@@ -25,11 +25,11 @@ case "an unverified sender's question is accepted, not answered" {
 }
 
 case "a verified sender gets a reply" {
-	expect triage(mailAbout("where is my parcel?"), DmarcPass) is Reply(_)
+	expect triage(mailAbout("where is my parcel?"), true) is Reply(_)
 }
 
-case "a failed DMARC check never earns a reply" {
-	expect triage(mailAbout("where is my parcel?"), DmarcFail) is Accept
+case "an unverified sender never earns a reply" {
+	expect triage(mailAbout("where is my parcel?"), false) is Accept
 }
 
 case "an oversized message is refused unread" {

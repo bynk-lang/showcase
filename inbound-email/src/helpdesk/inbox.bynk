@@ -15,15 +15,15 @@ What happens to a message to support. Pure, so a case can try every branch,
 including a sender whose domain passed DMARC, which a suite can't produce.
 
 `mail.from` is the envelope sender, which anyone can write, so it decides
-nothing. `dmarc` is Cloudflare's verdict on whether the sender's domain vouched
-for the message, and only that earns an automatic reply.
+nothing. `verified` says whether Cloudflare's DMARC check found that the
+sender's domain vouched for the message, and only that earns an automatic reply.
 ---
-fn triage(mail: InboundEmail, dmarc: DmarcVerdict) -> EmailVerdict {
+fn triage(mail: InboundEmail, verified: Bool) -> EmailVerdict {
 	if mail.size > MaxSize {
 		Reject("message too large")
 	} else if mail.subject.contains("refund") {
 		Forward("billing@shop.example")
-	} else if dmarc == DmarcPass {
+	} else if verified {
 		Reply(EmailReply { text: Some("Thanks, we have your message and will be in touch.") })
 	} else {
 		Accept
@@ -32,7 +32,7 @@ fn triage(mail: InboundEmail, dmarc: DmarcVerdict) -> EmailVerdict {
 
 service support from email("support@shop.example") {
 	on message(mail: InboundEmail) -> Effect[EmailVerdict] by s: Sender {
-		triage(mail, s.identity.dmarc)
+		triage(mail, s.identity.dmarc == DmarcPass)
 	}
 }
 

@@ -31,12 +31,12 @@ carries Cloudflare's DMARC verdict on the sender's domain (`DmarcPass`,
 pure function, so every branch can be tested:
 
 ```bynk
-fn triage(mail: InboundEmail, dmarc: DmarcVerdict) -> EmailVerdict {
+fn triage(mail: InboundEmail, verified: Bool) -> EmailVerdict {
 	if mail.size > MaxSize {
 		Reject("message too large")
 	} else if mail.subject.contains("refund") {
 		Forward("billing@shop.example")
-	} else if dmarc == DmarcPass {
+	} else if verified {
 		Reply(EmailReply { text: Some("Thanks, we have your message and will be in touch.") })
 	} else {
 		Accept
@@ -44,12 +44,12 @@ fn triage(mail: InboundEmail, dmarc: DmarcVerdict) -> EmailVerdict {
 }
 ```
 
-The service reads the verdict from the `Sender` it runs as:
+The service works out `verified` from the `Sender` it runs as:
 
 ```bynk
 service support from email("support@shop.example") {
 	on message(mail: InboundEmail) -> Effect[EmailVerdict] by s: Sender {
-		triage(mail, s.identity.dmarc)
+		triage(mail, s.identity.dmarc == DmarcPass)
 	}
 }
 ```
@@ -61,7 +61,7 @@ on the domain and refuses it. A named address always beats the catch-all.
 only the fields each case is about; the rest have defaults. `support.message(…)`
 runs the handler with no Worker and no mail. A suite has no Email Routing, so the
 sender's verdict there is always `DmarcNone`, and the reply branch is tested
-through `triage` with `DmarcPass` and `DmarcFail`.
+through `triage` with `verified` true and false.
 
 ## Run it
 
