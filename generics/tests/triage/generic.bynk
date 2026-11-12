@@ -51,15 +51,27 @@ suite triage.generic {
 	}
 
 	case "a chain is as long as its steps, and ends at its last" {
-		let director = Chain { head: "director", next: None }
-		let lead = Chain { head: "team lead", next: Some(director) }
-		let escalation = Chain { head: "on-call", next: Some(lead) }
+		let director = Chain {
+			head: "director",
+			next: None,
+		}
+		let lead = Chain {
+			head: "team lead",
+			next: Some(director),
+		}
+		let escalation = Chain {
+			head: "on-call",
+			next: Some(lead),
+		}
 		expect escalation.length() == 3
 		expect escalation.last() == "director"
 	}
 
 	case "a one-step chain is its own last step" {
-		let solo = Chain { head: 7, next: None }
+		let solo = Chain {
+			head: 7,
+			next: None,
+		}
 		expect solo.length() == 1
 		expect solo.last() == 7
 	}
