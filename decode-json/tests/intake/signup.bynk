@@ -34,6 +34,21 @@ suite intake.signup {
 		expect describe("{\"name\": \"Ada\", \"age\": 36}") == "welcome Ada"
 	}
 
+	case "YAML decodes to the same validated Signup" {
+		let r = fromYaml("name: Ada\nage: 36\nnote: hi\n")
+		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("hi") })
+	}
+
+	case "YAML gets the same refinements and paths" {
+		let r = fromYaml("name: Ada\nage: 5\n")
+		expect r is Err(DecodeError { kind: "RefinementViolation", path: "$.age", .. })
+	}
+
+	case "YAML that could smuggle structure is refused, not followed" {
+		let r = fromYaml("name: &n Ada\nage: 36\n")
+		expect r is Err(DecodeError { kind: "UnsupportedAnchor", .. })
+	}
+
 	case "encodePlain writes None as null and decodes back" {
 		let s = Signup {
 			name: "Ada",

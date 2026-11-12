@@ -53,10 +53,25 @@ fn render(s: Signup) -> String {
 }
 ```
 
+The same type decodes from YAML. `Yaml.decode[T]` reads a safe subset of YAML
+1.2 (no anchors, aliases, merge keys or tags, one document, bounded size and
+nesting) and passes the result to the same typed decode, so a `Signup` from a
+config file is checked exactly as one from a request:
+
+```bynk
+fn fromYaml(raw: String) -> Result[Signup, DecodeError] {
+	Yaml.decode[Signup](raw)
+}
+```
+
+A YAML refusal is a `DecodeError` too, with its own `kind`, such as
+`UnsupportedAnchor`, and a `message` ending in the line and column.
+
 **`tests/intake/signup.bynk`** feeds in bad text and checks the `kind` of each
 failure: malformed JSON, a missing field or wrong base type, and an empty name or
 out-of-range age. It also checks that the error path names `$.age`, and that
-`encodePlain` output decodes back.
+`encodePlain` output decodes back. The YAML cases decode the same `Signup`, hit
+the same refinement at the same path, and show an anchor refused.
 
 ## Run it
 
