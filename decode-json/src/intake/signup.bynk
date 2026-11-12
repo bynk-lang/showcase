@@ -25,6 +25,15 @@ fn parse(raw: String) -> Result[Signup, DecodeError] {
 	Json.decode[Signup](raw)
 }
 
+---
+The same sign-up written as YAML, such as a config file. `Yaml.decode` reads a
+safe subset of YAML 1.2 and hands the result to the same typed decode, so the
+refinements, the `Option` and the error's `$.path` are `Json.decode`'s.
+---
+fn fromYaml(raw: String) -> Result[Signup, DecodeError] {
+	Yaml.decode[Signup](raw)
+}
+
 --- Why a decode failed, built from the error's three string fields.
 fn describe(raw: String) -> String {
 	match Json.decode[Signup](raw) {

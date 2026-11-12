@@ -34,6 +34,44 @@ suite intake.signup {
 		expect describe("{\"name\": \"Ada\", \"age\": 36}") == "welcome Ada"
 	}
 
+	case "YAML decodes to the same validated Signup" {
+		let r = fromYaml("name: Ada\nage: 36\nnote: hi\n")
+		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("hi") })
+	}
+
+	case "YAML gets the same refinements and paths" {
+		match fromYaml("name: Ada\nage: 5\n") {
+			Err(e) => {
+				expect e.kind == "RefinementViolation"
+				expect e.path == "$.age"
+			},
+			Ok(_) => expect false,
+		}
+	}
+
+	// A plain scalar is typed by its shape before the decode sees it (the 1.2
+	// core schema): `1234` is an integer, so a `Name` refuses it where JSON's
+	// `"1234"` would decode. Quote it and it's a string. `no` stays a string.
+	case "a YAML scalar is typed before the decode sees it" {
+		expect fromYaml("name: \"1234\"\nage: 36\n") is Ok(_)
+		let r = fromYaml("name: Ada\nage: 36\nnote: no\n")
+		expect r == Ok(Signup { name: "Ada", age: 36, note: Some("no") })
+		match fromYaml("name: 1234\nage: 36\n") {
+			Err(e) => {
+				expect e.kind == "StructuralMismatch"
+				expect e.path == "$.name"
+			},
+			Ok(_) => expect false,
+		}
+	}
+
+	case "YAML that could smuggle structure is refused, not followed" {
+		match fromYaml("name: &n Ada\nage: 36\n") {
+			Err(e) => expect e.kind == "UnsupportedAnchor",
+			Ok(_) => expect false,
+		}
+	}
+
 	case "encodePlain writes None as null and decodes back" {
 		let s = Signup {
 			name: "Ada",
