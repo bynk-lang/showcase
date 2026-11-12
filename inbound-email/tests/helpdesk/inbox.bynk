@@ -19,6 +19,11 @@ case "a refund request goes to billing" {
 	expect r is Forward("billing@shop.example")
 }
 
+case "a refund is spotted whatever its case" {
+	expect triage(mailAbout("Refund for order 1042"), false) is Forward(_)
+	expect triage(mailAbout("REFUND PLEASE"), false) is Forward(_)
+}
+
 case "an unverified sender's question is accepted, not answered" {
 	let r <- support.message(mailAbout("where is my parcel?"))
 	expect r is Accept
@@ -26,6 +31,24 @@ case "an unverified sender's question is accepted, not answered" {
 
 case "a verified sender gets a reply" {
 	expect triage(mailAbout("where is my parcel?"), true) is Reply(_)
+}
+
+case "an auto-reply is never answered, even from a verified sender" {
+	let none: Map[String, String] = Map.empty()
+	let ooo = InboundEmail {
+		from: "ada@example.org",
+		to: "support@shop.example",
+		subject: "Out of office",
+		headers: none.insert("auto-submitted", "auto-replied"),
+	}
+	expect triage(ooo, true) is Accept
+	let digest = InboundEmail {
+		from: "list@example.org",
+		to: "support@shop.example",
+		subject: "Weekly digest",
+		headers: none.insert("precedence", "bulk"),
+	}
+	expect triage(digest, true) is Accept
 }
 
 case "an unverified sender never earns a reply" {

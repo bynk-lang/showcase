@@ -20,10 +20,20 @@ becomes of each message and calls no mail API:
 Keeping the handler a pure decision is what makes it testable: a case builds an
 `InboundEmail`, calls the handler, and checks the verdict.
 
-**Don't trust `from`.** `mail.from` is the envelope sender, and anyone can
-write any address there. The handler runs as the `Sender` actor, whose identity
-carries Cloudflare's DMARC verdict on the sender's domain (`DmarcPass`,
-`DmarcFail` or `DmarcNone`). Decide on the evidence, never on the claim.
+**Don't trust `from`.** `mail.from` is the envelope sender (SMTP `MAIL FROM`),
+and anyone can write any address there. The handler runs as the `Sender` actor,
+whose identity carries Cloudflare's DMARC verdict (`DmarcPass`, `DmarcFail` or
+`DmarcNone`). DMARC vouches for the domain in the message's `From` header, not
+for `mail.from`, so a pass says the message is genuinely from that domain, not
+that the envelope sender is. Decide on the evidence, never on the claim. A
+`Reply` goes back through Cloudflare, which allows one reply per message and
+only to a sender whose mail passed DMARC.
+
+**Don't answer robots.** An auto-reply must not answer another auto-reply, an
+out-of-office, a bounce or list mail (RFC 3834), or two helpdesks can thank each
+other forever. The runtime doesn't check for this, so `triage` does, through
+`isAutomated`: an `Auto-Submitted` header other than `no`, a `Precedence` of
+`bulk`, `list` or `junk`, or a `List-Id`.
 
 ## Walkthrough
 
@@ -34,9 +44,9 @@ pure function, so every branch can be tested:
 fn triage(mail: InboundEmail, verified: Bool) -> EmailVerdict {
 	if mail.size > MaxSize {
 		Reject("message too large")
-	} else if mail.subject.contains("refund") {
+	} else if mail.subject.toLower().contains("refund") {
 		Forward("billing@shop.example")
-	} else if verified {
+	} else if verified && !isAutomated(mail) {
 		Reply(EmailReply { text: Some("Thanks, we have your message and will be in touch.") })
 	} else {
 		Accept
@@ -61,7 +71,9 @@ on the domain and refuses it. A named address always beats the catch-all.
 only the fields each case is about; the rest have defaults. `support.message(…)`
 runs the handler with no Worker and no mail. A suite has no Email Routing, so the
 sender's verdict there is always `DmarcNone`, and the reply branch is tested
-through `triage` with `verified` true and false.
+through `triage` with `verified` true and false. Two more cases pin a refund
+spotted whatever its case, and an out-of-office or bulk digest left unanswered
+even when verified.
 
 ## Run it
 

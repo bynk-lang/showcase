@@ -15,19 +15,45 @@ What happens to a message to support. Pure, so a case can try every branch,
 including a sender whose domain passed DMARC, which a suite can't produce.
 
 `mail.from` is the envelope sender, which anyone can write, so it decides
-nothing. `verified` says whether Cloudflare's DMARC check found that the
-sender's domain vouched for the message, and only that earns an automatic reply.
+nothing. `verified` says whether Cloudflare's DMARC check found that the domain
+in the message's `From` header vouched for it, and only that earns an automatic
+reply. Never to another robot, though: see `isAutomated`.
 ---
 fn triage(mail: InboundEmail, verified: Bool) -> EmailVerdict {
 	if mail.size > MaxSize {
 		Reject("message too large")
-	} else if mail.subject.contains("refund") {
+	} else if mail.subject.toLower().contains("refund") {
 		Forward("billing@shop.example")
-	} else if verified {
+	} else if verified && !isAutomated(mail) {
 		Reply(EmailReply { text: Some("Thanks, we have your message and will be in touch.") })
 	} else {
 		Accept
 	}
+}
+
+---
+Whether the message came from a machine: an auto-reply, an out-of-office, a
+bounce or list traffic. RFC 3834 says an auto-responder must not answer one, or
+two helpdesks can answer each other's acknowledgements forever. The runtime
+doesn't check this, so `triage` does. Header names are lower-case in `headers`.
+---
+fn isAutomated(mail: InboundEmail) -> Bool {
+	let autoSubmitted = match mail.headers.get("auto-submitted") {
+		Some(v) => v.trim().toLower() != "no",
+		None => false,
+	}
+	let bulk = match mail.headers.get("precedence") {
+		Some(v) => {
+			let p = v.trim().toLower()
+			p == "bulk" || p == "list" || p == "junk"
+		},
+		None => false,
+	}
+	let listMail = match mail.headers.get("list-id") {
+		Some(_) => true,
+		None => false,
+	}
+	autoSubmitted || bulk || listMail
 }
 
 service support from email("support@shop.example") {
