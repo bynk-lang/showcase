@@ -29,6 +29,7 @@ to read next in [the book](https://bynk-lang.org/book/).
 | [`verify-webhooks`](verify-webhooks/) | signed webhooks verified for you; signing your own data | [Verify webhooks](https://bynk-lang.org/book/guides/actors/verify-webhooks/) |
 | [`scheduled-jobs`](scheduled-jobs/) | cron handlers, driven from tests at a chosen time | [Cron](https://bynk-lang.org/book/guides/entry-points/cron/) |
 | [`queues`](queues/) | sending to a queue, consuming it, `Ack` and `Retry` | [Queue](https://bynk-lang.org/book/guides/entry-points/queue/) |
+| [`inbound-email`](inbound-email/) | a service bound to an email address decides each message (accept, reject, forward or reply) and trusts the sender's DMARC verdict, never `from` (experimental) | [Receive email](https://bynk-lang.org/book/guides/entry-points/receive-email/) |
 | [`events`](events/) | declaring, emitting and subscribing to events | [Understand events](https://bynk-lang.org/book/guides/events/understand-events/) |
 | [`evolving-a-contract`](evolving-a-contract/) | one context calling another, tested across the real wire, and a request field added with a default so the callee can deploy first | [Contract skew](https://bynk-lang.org/book/guides/projects-build-and-deployment/contract-skew/) |
 | [`localisation`](localisation/) | message bundles, ICU plurals, `Locale` negotiation | [Understand localisation](https://bynk-lang.org/book/guides/localisation/understand-localisation/) |

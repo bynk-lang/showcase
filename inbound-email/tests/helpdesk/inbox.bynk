@@ -1,0 +1,79 @@
+---
+`support.message(…)` runs the handler on a message built in the case, with no
+Worker and no mail. Every `InboundEmail` field after `to` has a default, so a
+case writes only what it's about. In a suite the sender's DMARC verdict is
+`DmarcNone`, so the reply branch is tested through `triage` directly.
+---
+suite helpdesk.inbox
+
+fn mailAbout(subject: String) -> InboundEmail {
+	InboundEmail {
+		from: "ada@example.org",
+		to: "support@shop.example",
+		subject: subject,
+	}
+}
+
+case "a refund request goes to billing" {
+	let r <- support.message(mailAbout("refund for order 1042"))
+	expect r is Forward("billing@shop.example")
+}
+
+case "a refund is spotted whatever its case" {
+	expect triage(mailAbout("Refund for order 1042"), false) is Forward(_)
+	expect triage(mailAbout("REFUND PLEASE"), false) is Forward(_)
+}
+
+case "an unverified sender's question is accepted, not answered" {
+	let r <- support.message(mailAbout("where is my parcel?"))
+	expect r is Accept
+}
+
+case "a verified sender gets a reply" {
+	expect triage(mailAbout("where is my parcel?"), true) is Reply(_)
+}
+
+// A message carrying one header, as a robot's mail would. Built in a function
+// because a `let`-bound `InboundEmail` literal that leaves `text` and `html` to
+// their defaults can't be passed to `triage` yet: its generated TypeScript
+// doesn't type-check (https://github.com/bynk-lang/bynk/issues/3404).
+fn mailWithHeader(name: String, value: String) -> InboundEmail {
+	let none: Map[String, String] = Map.empty()
+	InboundEmail {
+		from: "robot@example.org",
+		to: "support@shop.example",
+		subject: "Automatic reply",
+		headers: none.insert(name, value),
+	}
+}
+
+case "an auto-reply is never answered, even from a verified sender" {
+	expect triage(mailWithHeader("auto-submitted", "auto-replied"), true) is Accept
+	expect triage(mailWithHeader("precedence", "bulk"), true) is Accept
+	expect triage(mailWithHeader("list-id", "<news.example.org>"), true) is Accept
+	expect triage(mailWithHeader("auto-submitted", "no"), true) is Reply(_)
+}
+
+case "an unverified sender never earns a reply" {
+	expect triage(mailAbout("where is my parcel?"), false) is Accept
+}
+
+case "an oversized message is refused unread" {
+	let huge = InboundEmail {
+		from: "ada@example.org",
+		to: "support@shop.example",
+		subject: "photos",
+		size: 20_000_000,
+	}
+	let r <- support.message(huge)
+	expect r is Reject(_)
+}
+
+case "mail to any other address is refused" {
+	let r <- nobody.message(InboundEmail {
+		from: "ada@example.org",
+		to: "sales@shop.example",
+		subject: "hello",
+	})
+	expect r is Reject("no such mailbox")
+}
