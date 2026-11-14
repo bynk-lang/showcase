@@ -33,24 +33,30 @@ remove them.
 [`src/prefs/site.bynk`](src/prefs/site.bynk) declares the cookies it reads:
 
 ```bynk
+const VisitsCookie: String = "__Host-visits"
+
 type Prefs = {
 	theme: Theme = Light,
-	@name("__Host-visits") visits: Int = 0,
+	@name(VisitsCookie) visits: Int = 0,
 }
 ```
 
 A first visit sends no cookies, so both fields have defaults. The visit count
 is a `__Host-` cookie, which the browser only accepts from this exact host over
 HTTPS, so a sibling subdomain can't plant one. `__Host-visits` isn't a valid
-field name, so `@name` gives the field the key the browser sends.
+field name, so `@name` gives the field the key the browser sends. The name is
+written once, as the constant `VisitsCookie`, which `@name` accepts because it
+is declared as a plain `String` bound to a literal.
 
 The handlers read `cookies.theme` and `cookies.visits` like any record, and set
-cookies on the way out:
+cookies on the way out. The visit count is written from the record that reads
+it, `Prefs.visits.cookie(n)`, so its name and value can't drift from what the
+next request decodes:
 
 ```bynk
 on GET("/visit") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
 	let n = cookies.visits + 1
-	Ok("visit \(n)").withCookie(Cookie { name: "__Host-visits", value: "\(n)" })
+	Ok("visit \(n)").withCookie(Prefs.visits.cookie(n))
 }
 ```
 

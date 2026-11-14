@@ -10,6 +10,9 @@ consumes bynk { Cookie }
 
 type Theme = enum { Light, Dark }
 
+--- The name of the visit-count cookie, written once for both reading and writing.
+const VisitsCookie: String = "__Host-visits"
+
 ---
 The cookies a request carries, decoded and validated before a handler runs.
 `theme` is absent on a first visit, so it has a default. The visit count lives
@@ -18,7 +21,7 @@ part of a field name, so `@name` gives the field the key the browser sends.
 ---
 type Prefs = {
 	theme: Theme = Light,
-	@name("__Host-visits") visits: Int = 0,
+	@name(VisitsCookie) visits: Int = 0,
 }
 
 --- How a theme reads in a response and in its cookie.
@@ -51,6 +54,6 @@ service site from http {
 	--- Count this visit, and send the new count back to be remembered.
 	on GET("/visit") (cookies: Prefs) -> Effect[HttpResult[String]] by Visitor {
 		let n = cookies.visits + 1
-		Ok("visit \(n)").withCookie(Cookie { name: "__Host-visits", value: "\(n)" })
+		Ok("visit \(n)").withCookie(Prefs.visits.cookie(n))
 	}
 }

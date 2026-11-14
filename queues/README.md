@@ -18,8 +18,9 @@ dead-letter queue takes it.
 On the producer side, `Queue @name("packing")` from `bynk.cloudflare` is a
 capability like any other, so the route names it in `given`. The route waits
 for the send with `let _ <-`, because it must not promise work that isn't on the
-queue yet. Its log line uses `~>`, Bynk's fire-and-forget send, because nothing
-depends on it finishing.
+queue yet. Its log line uses `do ….detach()`, which stops waiting for an effect that is
+already running, because nothing depends on it finishing. If a detached effect
+fails, the runtime reports the failure instead of losing it.
 
 ## Walkthrough
 
@@ -31,7 +32,7 @@ depends on it finishing.
 
    ```bynk
    let _ <- Packing.sendValue(PackJob { sku: body.sku, quantity: body.quantity })
-   ~> Logger.info("queued \(body.quantity) x \(body.sku)")
+   do Logger.info("queued \(body.quantity) x \(body.sku)").detach()
    Accepted("queued")
    ```
 
@@ -42,7 +43,7 @@ depends on it finishing.
    Ok(quantity) => {
    	let taken <- Shelf(sku).take(quantity)
    	if taken {
-   		~> Logger.info("packed \(quantity) x \(sku)")
+   		do Logger.info("packed \(quantity) x \(sku)").detach()
    		Ack
    	} else {
    		Retry("not enough \(sku) in stock")
