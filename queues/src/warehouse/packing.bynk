@@ -61,13 +61,15 @@ service api from http {
 	Enqueues the order and answers at once; the packer does the work later.
 	The send is awaited with `let _ <-`: replying `Accepted` before the message is
 	on the queue would promise work that might never happen. The log line is
-	fire-and-forget with `~>`, since nothing depends on it finishing.
+	detached with `do ….detach()`: nothing depends on it finishing, so the handler
+	stops waiting for it. A failure in a detached effect is reported by the
+	runtime, not lost.
 	---
 	on POST("/orders") (
 		body: Order
 	) -> Effect[HttpResult[String]] by Visitor given Packing, Logger {
 		let _ <- Packing.sendValue(PackJob { sku: body.sku, quantity: body.quantity })
-		~> Logger.info("queued \(body.quantity) x \(body.sku)")
+		do Logger.info("queued \(body.quantity) x \(body.sku)").detach()
 		Accepted("queued")
 	}
 
@@ -99,18 +101,18 @@ service packer from queue("packing") {
 	on message(job: PackJob) -> Effect[QueueResult] given Logger {
 		match Sku.of(job.sku) {
 			Err(_) => {
-				~> Logger.warn("dropping a job for unknown SKU \(job.sku)")
+				do Logger.warn("dropping a job for unknown SKU \(job.sku)").detach()
 				Ack
 			},
 			Ok(sku) => match Quantity.of(job.quantity) {
 				Err(_) => {
-					~> Logger.warn("dropping a job for \(job.quantity) x \(sku)")
+					do Logger.warn("dropping a job for \(job.quantity) x \(sku)").detach()
 					Ack
 				},
 				Ok(quantity) => {
 					let taken <- Shelf(sku).take(quantity)
 					if taken {
-						~> Logger.info("packed \(quantity) x \(sku)")
+						do Logger.info("packed \(quantity) x \(sku)").detach()
 						Ack
 					} else {
 						Retry("not enough \(sku) in stock")
