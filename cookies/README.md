@@ -11,12 +11,15 @@ into the record `T` before it runs: refinements, defaults and `Option`s apply,
 and a value that doesn't fit is a `400` naming the cookie (`cookies.theme`).
 Cookies the record doesn't name, such as an analytics cookie, are ignored.
 
-Setting a cookie is a method on the result, `withCookie(Cookie { … })`. A
-`Cookie` record starts from the safe attributes: `Secure`, `HttpOnly`,
-`SameSite=Lax`, `Path=/`, and no `Domain`. Turning one of them off in a literal
-is refused or warned about, as is a `__Host-` cookie that breaks the prefix's
-rules. `clearCookie` sends the same cookie back empty and already expired,
-which is how a browser forgets one.
+Setting a cookie is a method on the result, `withCookie(…)`. A cookie that a
+`cookies` record reads is written from that record, `Prefs.theme.cookie(Dark)`
+or `Prefs.visits.cookie(n)`, so its name and value can't drift from what the
+next request decodes. Spread it into a `Cookie { … }` literal to set an
+attribute such as `maxAge`. The cookie starts from the safe attributes:
+`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`. Turning one of
+them off in a literal is refused or warned about, as is a `__Host-` cookie that
+breaks the prefix's rules. `Prefs.theme.expire()` sends the same cookie back
+already expired, which is how a browser forgets one.
 
 A cookie arrives from the client, so it's input like any other, never proof of
 who's asking. That's why `visits` is only a count.

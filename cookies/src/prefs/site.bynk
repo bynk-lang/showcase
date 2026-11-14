@@ -43,12 +43,12 @@ service site from http {
 	defaults: `Secure`, `HttpOnly`, `SameSite=Lax` and `Path=/`.
 	---
 	on POST("/theme/dark") () -> Effect[HttpResult[String]] by Visitor {
-		Ok("dark").withCookie(Cookie { name: "theme", value: "Dark", maxAge: Some(365.days) })
+		Ok("dark").withCookie(Cookie { ...Prefs.theme.cookie(Dark), maxAge: Some(365.days) })
 	}
 
-	--- Forget the choice: the same cookie again, empty and already expired.
+	--- Forget the choice: the same cookie again, already expired.
 	on POST("/theme/reset") () -> Effect[HttpResult[()]] by Visitor {
-		NoContent.clearCookie(Cookie { name: "theme", value: "" })
+		NoContent.withCookie(Prefs.theme.expire())
 	}
 
 	--- Count this visit, and send the new count back to be remembered.
