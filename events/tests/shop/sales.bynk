@@ -1,6 +1,8 @@
 --- The second listener hears what the loyalty scheme ignores.
 suite shop.sales
 
+consumes shop.orders { OrderPlaced, Region }
+
 case "every order is tallied, whatever its region" {
 	let _ <- TallySale.event(OrderPlaced {
 		orderId: "o-1",

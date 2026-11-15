@@ -1,5 +1,7 @@
 suite uptime.monitor
 
+consumes bynk { FetchError, Method, Request, Response, Fetch }
+
 // `Fetch` faults under test unless stubbed, so a case that fires the probe
 // says what the upstream answers. The test clock reads the epoch, so a target
 // added over HTTP starts with `seenUp` at midnight on day 0. Each `at` is a

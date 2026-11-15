@@ -1,5 +1,7 @@
 suite weather.api
 
+consumes bynk { Response, Secrets, Fetch }
+
 // The handler only knows `Forecasts`, so most cases stub that one seam and
 // never go near the network. `expect Fetch.send never called` proves it.
 

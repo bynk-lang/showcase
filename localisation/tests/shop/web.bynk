@@ -1,5 +1,7 @@
 suite shop.web
 
+consumes bynk { Locale }
+
 // At the unit tier `Locale` is a test double. A stub chooses the language,
 // which shows the handler renders whatever tag the capability reports.
 

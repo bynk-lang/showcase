@@ -1,5 +1,7 @@
 suite stockroom.shop
 
+consumes bynk { Clock }
+
 // Suite helpers are pure, so they build the products and each case shelves them.
 fn tea() -> Product {
 	Product {
