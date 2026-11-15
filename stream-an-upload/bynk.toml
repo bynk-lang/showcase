@@ -1,0 +1,6 @@
+[project]
+name = "stream-an-upload"
+version = "0.1.0"
+
+[unstable]
+allow = ["bynk.cloudflare.R2"]

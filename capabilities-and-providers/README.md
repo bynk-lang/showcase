@@ -32,8 +32,12 @@ visible and swappable:
    capabilities and declares the app's own:
 
    ```bynk
-   consumes bynk { Fetch, Logger, Secrets }
+   consumes bynk { Fetch, Logger, Secrets, Request, Method }
    ```
+
+   A braced `consumes` brings in only the names it lists, so the `Request`
+   record and its `Method` (the `Get` the provider sends) are listed beside
+   the capabilities.
 
    ```bynk
    capability Forecasts {

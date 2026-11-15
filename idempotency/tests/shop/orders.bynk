@@ -1,0 +1,76 @@
+---
+The test double for `Idempotency` is in memory and honours its windows on the
+test clock, so a case can send the same key twice, or `advance Clock` past the
+window, and see what a real retry would.
+---
+suite shop.orders
+
+fn keyed(key: String) -> RequestHeaders {
+	RequestHeaders.of(["Idempotency-Key: \(key)"])
+}
+
+fn order() -> OrderRequest {
+	OrderRequest {
+		sku: "teapot",
+		quantity: 2,
+	}
+}
+
+case "the first attempt places the order" {
+	stub Warehouse.reserve(_, _, _) returns Ok("r-1")
+	let r <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	expect r == Created("r-1")
+}
+
+case "a retry gets the first answer and reserves nothing more" {
+	stub Warehouse.reserve(_, _, _) returns each [Ok("r-1"), Ok("r-2")]
+	let first <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	let retry <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	// The same answer, status and all, as if the first response had arrived.
+	expect first == Created("r-1")
+	expect retry == Created("r-1")
+	expect Warehouse.reserve called once
+}
+
+case "another key is another order" {
+	stub Warehouse.reserve(_, _, _) returns each [Ok("r-1"), Ok("r-2")]
+	let _ <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	let other <- orders.POST("/orders", keyed("k-2"), order()) by Visitor
+	expect other == Created("r-2")
+	expect Warehouse.reserve called 2 times
+}
+
+// A 5xx releases the claim, so the client's retry does the work it came for.
+case "a failed attempt gives the key back for the retry" {
+	stub Warehouse.reserve(_, _, _) returns each [Err(WarehouseDown), Ok("r-1")]
+	let failed <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	let retry <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	expect failed is ServiceUnavailable(_)
+	expect retry == Created("r-1")
+	expect Logger.warn called once
+}
+
+// A 4xx is a finished answer, so the claim is kept and the retry is told the
+// same thing, even though the stock has come back since.
+case "a refused order keeps its key and its answer" {
+	stub Warehouse.reserve(_, _, _) returns each [Err(OutOfStock), Ok("r-1")]
+	let refused <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	let retry <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	expect refused == Conflict("out of stock")
+	expect retry == Conflict("out of stock")
+	expect Warehouse.reserve called once
+}
+
+case "a key is forgotten after its window" {
+	stub Warehouse.reserve(_, _, _) returns each [Ok("r-1"), Ok("r-2")]
+	let _ <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	advance Clock by 25.hours
+	let later <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	expect later == Created("r-2")
+}
+
+case "an order without a key is refused before anything is claimed" {
+	let r <- orders.POST("/orders", RequestHeaders.empty(), order()) by Visitor
+	expect r is BadRequest(_)
+	expect Warehouse.reserve never called
+}

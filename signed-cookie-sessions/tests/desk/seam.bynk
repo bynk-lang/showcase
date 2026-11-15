@@ -1,0 +1,58 @@
+// At `system` the driver sends a real signed cookie to the real Worker, and the
+// seam verifies it before any handler runs. The reserved principals probe it:
+// `by Nobody` sends no cookie, `by Forged` one signed with a key the Worker
+// doesn't hold, and `by Expired` one whose eight hours are up.
+suite desk.site as system {
+	case "a signed cookie is verified and read" {
+		let r <- site.GET("/me") by User("ada")
+		expect r is Ok("ada")
+	}
+
+	case "no cookie is refused" {
+		let r <- site.GET("/me") by Nobody
+		expect r is Rejected(Unauthorized)
+	}
+
+	case "a cookie signed with another key is refused" {
+		let r <- site.GET("/me") by Forged
+		expect r is Rejected(Unauthorized)
+	}
+
+	case "an expired cookie is refused" {
+		let r <- site.GET("/me") by Expired
+		expect r is Rejected(Unauthorized)
+	}
+
+	// The driver sends `Sec-Fetch-Site: same-origin`, as a browser does for the
+	// site's own pages, unless a case's headers say otherwise.
+	case "a change from the site's own page goes through" {
+		let r <- site.POST("/away") by User("ada")
+		expect r is Ok("ada is away")
+	}
+
+	case "a change from a listed origin goes through" {
+		let r <- site.POST(
+			"/away",
+			RequestHeaders.of(["Sec-Fetch-Site: cross-site", "Origin: https://desk.example.com"])
+		) by User("ada")
+		expect r is Ok("ada is away")
+	}
+
+	// A valid cookie isn't enough: a page on another site could make the
+	// browser send it. That's cross-site request forgery, and the seam refuses it.
+	case "a change from any other site is refused, cookie and all" {
+		let r <- site.POST(
+			"/away",
+			RequestHeaders.of(["Sec-Fetch-Site: cross-site", "Origin: https://evil.example"])
+		) by User("ada")
+		expect r is Forbidden
+	}
+
+	case "a read from another site is not checked" {
+		let r <- site.GET(
+			"/me",
+			RequestHeaders.of(["Sec-Fetch-Site: cross-site", "Origin: https://evil.example"])
+		) by User("ada")
+		expect r is Ok("ada")
+	}
+}

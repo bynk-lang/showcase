@@ -1,0 +1,45 @@
+---
+At the unit tier `by User("ada")` hands the handler that identity, so these cases
+test what the handlers do with a session: issue it, read it, clear it.
+---
+suite desk.site
+
+case "a good password signs in and sets the session cookie" {
+	stub Accounts.verify(_, _) returns true
+	let r <- site.POST("/login", Login { user: "ada", password: "correct horse" }) by Visitor
+	// `is`, not `==`: the result also carries the cookie it sets.
+	expect r is Ok("signed in as ada")
+	expect r.cookies().map((c) => c.name) == ["__Host-session"]
+}
+
+case "the session cookie is safe without asking" {
+	stub Accounts.verify(_, _) returns true
+	let r <- site.POST("/login", Login { user: "ada", password: "correct horse" }) by Visitor
+	expect r.cookies().all((c) => c.secure && c.httpOnly && c.path == "/" && c.domain == None)
+	expect r.cookies().all((c) => c.maxAge == Some(8.hours))
+}
+
+case "a wrong password is refused and issues nothing" {
+	stub Accounts.verify(_, _) returns false
+	let r <- site.POST("/login", Login { user: "ada", password: "guess" }) by Visitor
+	expect r is Unauthorized
+	expect r.cookies() == []
+}
+
+case "a name that can't be an identity is refused before the password is checked" {
+	let r <- site.POST("/login", Login { user: "", password: "x" }) by Visitor
+	expect r is BadRequest(_)
+	expect Accounts.verify never called
+}
+
+case "a signed-in request reads its identity" {
+	let r <- site.GET("/me") by User("ada")
+	expect r == Ok("ada")
+}
+
+case "signing out sends the session cookie back expired" {
+	let r <- site.POST("/logout") by User("ada")
+	expect r is NoContent
+	expect r.cookies().map((c) => c.name) == ["__Host-session"]
+	expect r.cookies().all((c) => c.value == "" && c.maxAge == Some(0.seconds))
+}

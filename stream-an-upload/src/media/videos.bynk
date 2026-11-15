@@ -1,0 +1,43 @@
+---
+Accept a video too big to hold in memory and pass it straight on to R2, a chunk
+at a time, with a cap on how much a client may send.
+---
+context media.videos
+
+consumes bynk.cloudflare { R2 }
+
+--- The bucket. `bynk deploy` creates it as `<worker>-videos`.
+capability Videos = R2
+
+service videos from http {
+	// A `@raw` route must bound its body: here, two gigabytes. A streamed body
+	// is counted as the handler reads it, so the cap holds even when the client
+	// sends no length.
+	limits {
+		maxBody: 2_000_000_000,
+	}
+
+	---
+	Store a video under `name`. The `Stream[Bytes]` body is what turns
+	streaming on: the handler starts before the upload has finished arriving,
+	and the bytes go to R2 as they come.
+
+	`putStream` writes exactly `size` bytes, so the size comes from the
+	`Content-Length` header. A stream with more or fewer bytes faults the
+	write and R2 stores nothing, so a client that lies about the length can't
+	leave half a video behind.
+	---
+	@raw(contentType: "video/mp4")
+	on PUT("/videos/:name") (
+		name: String,
+		headers: RequestHeaders,
+		body: Stream[Bytes]
+	) -> Effect[HttpResult[()]] by Visitor given Videos {
+		let Some(length) = headers.get("content-length") else {
+			BadRequest("send a Content-Length")
+		}
+		let Some(size) = Int.parse(length) else { BadRequest("Content-Length is not a number") }
+		let _ <- Videos.putStream(name, body, size)
+		NoContent
+	}
+}

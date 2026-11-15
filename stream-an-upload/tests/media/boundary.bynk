@@ -1,0 +1,27 @@
+// At `system` the driver sends a stream chunked, with no `Content-Length`, so the
+// router's own checks run before and while the handler reads: the media type,
+// and the running count against the cap.
+suite media.videos as system {
+	// A `Wire(…)` body is one streamed chunk of `text/plain`.
+	case "anything but a video is refused before the handler runs" {
+		let r <- videos.PUT(
+			"/videos/:name",
+			"clip.mp4",
+			RequestHeaders.empty(),
+			Wire("not a video")
+		)
+		expect r is Rejected(UnsupportedMediaType(_))
+	}
+
+	// Sent chunked, the stream has no length for `putStream`, so the handler
+	// answers for itself. A browser `PUT`ting a `File` sends one.
+	case "a chunked upload reaches the handler, which asks for a length" {
+		let r <- videos.PUT(
+			"/videos/:name",
+			"clip.mp4",
+			RequestHeaders.empty(),
+			Stream.of([Bytes.fromUtf8("moov")])
+		)
+		expect r is BadRequest(_)
+	}
+}
