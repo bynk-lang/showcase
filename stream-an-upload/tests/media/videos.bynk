@@ -1,0 +1,38 @@
+---
+At the unit tier a case passes the body as a `Stream`, usually `Stream.of([…])`,
+and it reaches the handler as it is. The case sets `Content-Length` itself, and
+the in-memory bucket shows what was stored.
+---
+suite media.videos
+
+fn chunks() -> Stream[Bytes] {
+	Stream.of([Bytes.fromUtf8("moov"), Bytes.fromUtf8("mdat")])
+}
+
+case "a video is streamed into the bucket" {
+	let r <- videos.PUT(
+		"/videos/:name",
+		"clip.mp4",
+		RequestHeaders.of(["Content-Length: 8"]),
+		chunks()
+	) by Visitor
+	expect r is NoContent
+	let stored <- Videos.get("clip.mp4")
+	expect stored == Some(Bytes.fromUtf8("moovmdat"))
+}
+
+case "an upload with no Content-Length is refused and nothing is stored" {
+	let r <- videos.PUT("/videos/:name", "clip.mp4", RequestHeaders.empty(), chunks()) by Visitor
+	expect r is BadRequest(_)
+	expect Videos.putStream never called
+}
+
+case "a Content-Length that isn't a number is refused" {
+	let r <- videos.PUT(
+		"/videos/:name",
+		"clip.mp4",
+		RequestHeaders.of(["Content-Length: lots"]),
+		chunks()
+	) by Visitor
+	expect r is BadRequest(_)
+}

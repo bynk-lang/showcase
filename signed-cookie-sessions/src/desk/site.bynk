@@ -1,0 +1,117 @@
+---
+A browser signs in once and is recognised on every later request by a session
+cookie that Bynk issues and verifies itself. There is no token service to call
+and no session store to run: the cookie carries the user's id, signed.
+---
+context desk.site
+
+consumes bynk { Clock, Fetch, Secrets, Request, Method }
+
+--- Who a session belongs to. It travels in the cookie, so it must be safe to read.
+type UserId = String where NonEmpty && MaxLength(64)
+
+type Login = {
+	user: String,
+	password: String,
+}
+
+---
+The people who may sign in, in the app's own words. The check lives behind a
+capability so the handler never sees how passwords are stored, and a test
+stubs it.
+---
+capability Accounts {
+	fn verify(user: UserId, password: String) -> Effect[Bool]
+}
+
+--- What the accounts service is asked.
+type Credentials = {
+	user: UserId,
+	password: String,
+}
+
+---
+The production provider: an accounts service at `ACCOUNTS_URL` that answers
+`204` for a good password. Anything else, an outage included, is a no: a
+sign-in check fails closed. The tests stub `Accounts`, so they never reach it.
+---
+provides Accounts = HttpAccounts given Fetch, Secrets {
+	fn verify(user: UserId, password: String) -> Effect[Bool] {
+		let base <- Secrets.get("ACCOUNTS_URL")
+		match base {
+			None => Effect.pure(false),
+			Some(url) => {
+				let res <- Fetch.send(Request {
+					method: Post,
+					url: "\(url)/verify",
+					contentType: Some("application/json"),
+					authorization: None,
+					headers: Map.empty(),
+					body: Some(Json.encode(Credentials { user: user, password: password })),
+				})
+				match res {
+					Ok(r) => Effect.pure(r.status == 204),
+					Err(_) => Effect.pure(false),
+				}
+			},
+		}
+	}
+}
+
+---
+A signed-in browser. The scheme names the variable that holds the signing key,
+not the key: `bynk deploy` mints a strong one the first time and keeps it, and
+`bynk dev` derives a local one. A cookie lives for eight hours.
+
+The cookie is `__Host-session`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`,
+with no `Domain`. The scheme sets all of that; a handler can't loosen it.
+---
+actor User { auth = SignedCookie(secret = "SESSION_KEY", ttl = 8.hours), identity = UserId }
+
+service site from http {
+	// A state-changing route guarded by `User` also refuses a cross-site request.
+	// A page on another origin only gets through if it's listed here, with
+	// `credentials: true`.
+	cors {
+		origins: ["https://desk.example.com"],
+		credentials: true,
+	}
+
+	---
+	Sign in. The credentials are checked first: the cookie proves who it was
+	issued to, not that they should have had it. Issuing reads the clock, to
+	stamp the cookie's expiry, so the handler is given `Clock`.
+	---
+	on POST("/login") (body: Login) -> Effect[HttpResult[String]] by Visitor given Accounts, Clock {
+		let Ok(id) = UserId.of(body.user) else { BadRequest("a user name is 1 to 64 characters") }
+		let ok <- Accounts.verify(id, body.password)
+		if ok {
+			let session <- User.issue(id)
+			Ok("signed in as \(id)").withCookie(session)
+		} else {
+			Unauthorized
+		}
+	}
+
+	---
+	Who is signed in. The cookie was verified before this body runs, and the
+	handler gets the identity, never the cookie itself.
+	---
+	on GET("/me") () -> Effect[HttpResult[String]] by u: User {
+		Ok(u.identity)
+	}
+
+	--- A change only the signed-in user can make, from this site's own pages.
+	on POST("/away") () -> Effect[HttpResult[String]] by u: User {
+		Ok("\(u.identity) is away")
+	}
+
+	---
+	Sign out. `expire()` sends the same cookie back already expired. It clears
+	the browser's copy; it can't revoke one someone already took, which is why
+	the `ttl` is short.
+	---
+	on POST("/logout") () -> Effect[HttpResult[()]] by User {
+		NoContent.withCookie(User.expire())
+	}
+}

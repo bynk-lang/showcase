@@ -2,7 +2,7 @@ context shelf.library
 
 uses shelf.books
 consumes bynk { Logger }
-consumes bynk.cloudflare { D1 }
+consumes bynk.cloudflare { D1, SqlValue, SqlError, SqlReadError }
 
 ---
 The reading list's database. It binds as `env.D1_BOOKS` and is named

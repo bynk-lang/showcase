@@ -1,7 +1,7 @@
 context payments.hooks
 
 consumes bynk { Secrets }
-consumes bynk.crypto { Crypto }
+consumes bynk.crypto { Crypto, Digest }
 
 ---
 A payment notice, as the processor sends it. The body is parsed only after its

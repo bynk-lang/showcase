@@ -1,0 +1,133 @@
+---
+A client that never saw an answer retries, so the same order can arrive twice,
+or two copies at once. The client sends an `Idempotency-Key` with each attempt;
+the first attempt to claim the key places the order, and every repeat gets the
+first attempt's answer back instead of a second order.
+---
+context shop.orders
+
+consumes bynk { Idempotency, Claim, Logger, Fetch, Secrets, Request, Method }
+
+type Sku = String where NonEmpty && MaxLength(32)
+
+type OrderRequest = {
+	sku: Sku,
+	quantity: Int where Positive,
+}
+
+---
+How an order ended. It's `Codable`, so `remember` can keep it and a repeat can
+be given the same answer.
+---
+type Outcome =
+	| Placed(reservation: String)
+	| SoldOut
+
+type ReserveError = enum { OutOfStock, WarehouseDown }
+
+---
+The warehouse, in the app's own words. `key` is the order's idempotency key,
+passed along so the warehouse can deduplicate too: a claim makes this handler
+finish at most once, but a reservation made just before a failure would
+otherwise be made again on the retry.
+---
+capability Warehouse {
+	fn reserve(key: String, sku: Sku, quantity: Int) -> Effect[Result[String, ReserveError]]
+}
+
+---
+The production provider: the warehouse's HTTP API, at `WAREHOUSE_URL`, which
+answers a reservation with its id. The tests stub `Warehouse`, so they never
+reach it.
+---
+provides Warehouse = HttpWarehouse given Fetch, Secrets {
+	fn reserve(key: String, sku: Sku, quantity: Int) -> Effect[Result[String, ReserveError]] {
+		let base <- Secrets.get("WAREHOUSE_URL")
+		match base {
+			None => Err(WarehouseDown),
+			Some(url) => {
+				let res <- Fetch.send(Request {
+					method: Post,
+					url: "\(url)/reservations/\(sku)?quantity=\(quantity)",
+					contentType: None,
+					authorization: None,
+					headers: Map.empty().insert("Idempotency-Key", key),
+					body: None,
+				})
+				match res {
+					Err(_) => Err(WarehouseDown),
+					Ok(r) => match r.status {
+						201 => Ok(r.body),
+						409 => Err(OutOfStock),
+						_ => Err(WarehouseDown),
+					},
+				}
+			},
+		}
+	}
+}
+
+--- The response an outcome gets, the first time and every time after.
+fn answer(o: Outcome) -> HttpResult[String] {
+	match o {
+		Placed(reservation) => Created(reservation),
+		SoldOut => Conflict("out of stock"),
+	}
+}
+
+--- How long a key holds: a client that retries for a day is still covered.
+const KeyWindow: Duration = 24.hours
+
+service orders from http {
+	---
+	Place an order, at most once per `Idempotency-Key`.
+
+	`claim` is the race-free part: exactly one attempt gets `Claimed`, even when
+	two arrive together. That attempt does the work and `remember`s how it
+	ended. A repeat reads that back with `dedup`, so it gets exactly the answer
+	the first attempt got. A repeat that arrives while the first is still running finds
+	nothing remembered yet, and is told to try again.
+
+	When this handler fails (a fault, an `Err`, or a 5xx) the claim is given
+	back, so the client's retry is processed, which is why a warehouse outage
+	remembers nothing. A 4xx, such as out of stock, is a finished answer and
+	keeps the claim.
+	---
+	on POST("/orders") (
+		headers: RequestHeaders,
+		body: OrderRequest
+	) -> Effect[HttpResult[String]] by Visitor given Idempotency, Warehouse, Logger {
+		let Some(key) = headers.get("idempotency-key") else {
+			BadRequest("send an Idempotency-Key header")
+		}
+		let claimed <- Idempotency.claim(key, KeyWindow)
+		match claimed {
+			AlreadyClaimed => {
+				let earlier <- Idempotency.dedup[Outcome](key)
+				match earlier {
+					Some(outcome) => answer(outcome),
+					None => Conflict("this order is still being placed, try again shortly"),
+				}
+			},
+			Claimed => {
+				let reserved <- Warehouse.reserve(key, body.sku, body.quantity)
+				// `remember` and `dedup` scope their keys to the function that calls
+				// them, so both stay in this handler rather than in a helper.
+				match reserved {
+					Ok(id) => {
+						do Idempotency.remember[Outcome](key, Placed(id), KeyWindow)
+						answer(Placed(id))
+					},
+					Err(OutOfStock) => {
+						do Idempotency.remember[Outcome](key, SoldOut, KeyWindow)
+						answer(SoldOut)
+					},
+					Err(WarehouseDown) => {
+						do Logger.warn("warehouse down, order \(key) not placed")
+						ServiceUnavailable("try again shortly")
+					},
+				}
+			},
+		}
+	}
+}

@@ -1,7 +1,7 @@
 context weather.api
 
 uses weather.forecast
-consumes bynk { Fetch, Logger, Secrets }
+consumes bynk { Fetch, Logger, Secrets, Request, Method }
 
 ---
 Why a forecast could not be had. The domain capability speaks in these terms,

@@ -1,7 +1,7 @@
 context uptime.monitor
 
 uses uptime.policy
-consumes bynk { Clock, Fetch, Logger, TimedOut }
+consumes bynk { Clock, Fetch, Logger, TimedOut, Request, Method }
 
 type Name = String where NonEmpty && MaxLength(40)
 
