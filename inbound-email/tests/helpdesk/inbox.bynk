@@ -6,6 +6,8 @@ case writes only what it's about. In a suite the sender's DMARC verdict is
 ---
 suite helpdesk.inbox
 
+consumes bynk.cloudflare { EmailVerdict, InboundEmail }
+
 fn mailAbout(subject: String) -> InboundEmail {
 	InboundEmail {
 		from: "ada@example.org",

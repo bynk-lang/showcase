@@ -5,6 +5,8 @@ pattern filter applies. No checkout is involved.
 ---
 suite shop.loyalty
 
+consumes shop.orders { OrderPlaced, Region }
+
 --- A £25.99 order from ada, numbered `id`.
 fn order(id: String, region: Region) -> OrderPlaced {
 	OrderPlaced {

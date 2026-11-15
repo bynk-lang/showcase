@@ -8,6 +8,9 @@ case needs a different answer; every other operation keeps its double.
 ---
 suite holds.desk
 
+consumes bynk { Clock }
+consumes bynk.cloudflare { Kv }
+
 ---
 A hold request where the seat count doesn't matter to the case. The reference
 does, because the cases look the hold up by it, so it is pinned.

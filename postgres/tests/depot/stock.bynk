@@ -6,6 +6,8 @@ still answers first, which is how a case forces an outage.
 ---
 suite depot.stock
 
+consumes bynk.cloudflare { PgError }
+
 case "a fresh database has no stock" {
 	let r <- depot.GET("/stock") by Visitor
 	expect r == Ok([])

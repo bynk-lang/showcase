@@ -6,6 +6,8 @@ decoding rules themselves, field by field.
 ---
 suite newsletter.site
 
+consumes bynk { File }
+
 case "a sign-up is confirmed from the decoded form" {
 	let form = SignupForm {
 		email: "ada@example.com",

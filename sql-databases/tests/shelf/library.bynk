@@ -1,5 +1,7 @@
 suite shelf.library
 
+consumes bynk.cloudflare { SqlError, SqlStatement }
+
 fn dune() -> NewBook {
 	NewBook {
 		isbn: "9780441013593",
