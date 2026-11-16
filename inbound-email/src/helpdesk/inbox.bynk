@@ -36,6 +36,9 @@ Whether the message came from a machine: an auto-reply, an out-of-office, a
 bounce or list traffic. RFC 3834 says an auto-responder must not answer one, or
 two helpdesks can answer each other's acknowledgements forever. The runtime
 doesn't check this, so `triage` does. Header names are lower-case in `headers`.
+
+A bounce often carries none of these headers, but it always has an empty
+envelope sender (`MAIL FROM:<>`), and RFC 3834 says never to answer one.
 ---
 fn isAutomated(mail: InboundEmail) -> Bool {
 	let autoSubmitted = match mail.headers.get("auto-submitted") {
@@ -53,7 +56,8 @@ fn isAutomated(mail: InboundEmail) -> Bool {
 		Some(_) => true,
 		None => false,
 	}
-	autoSubmitted || bulk || listMail
+	let nullSender = mail.from == "" || mail.from == "<>"
+	autoSubmitted || bulk || listMail || nullSender
 }
 
 service support from email("support@shop.example") {

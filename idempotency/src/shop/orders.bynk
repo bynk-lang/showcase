@@ -8,7 +8,12 @@ context shop.orders
 
 consumes bynk { Idempotency, Claim, Logger, Fetch, Secrets, Request, Method }
 
-type Sku = String where NonEmpty && MaxLength(32)
+---
+A stock code. It goes into the path of the warehouse's URL, so it is held to
+letters, digits and hyphens: a `/`, `?` or `#` could otherwise change which
+request is sent.
+---
+type Sku = String where Matches("[a-z0-9-]+") && MaxLength(32)
 
 type OrderRequest = {
 	sku: Sku,
@@ -16,12 +21,22 @@ type OrderRequest = {
 }
 
 ---
-How an order ended. It's `Codable`, so `remember` can keep it and a repeat can
-be given the same answer.
+How an order ended. It's `Codable`, so `remember` can keep it (inside
+`Answered`) and a repeat can be given the same answer.
 ---
 type Outcome =
 	| Placed(reservation: String)
 	| SoldOut
+
+---
+What a key remembers: the order it was first used for, and how that ended. A
+repeat is answered only if it is the same order, so a key reused for a
+different one is refused rather than given another order's answer.
+---
+type Answered = {
+	order: OrderRequest,
+	outcome: Outcome,
+}
 
 type ReserveError = enum { OutOfStock, WarehouseDown }
 
@@ -85,8 +100,13 @@ service orders from http {
 	`claim` is the race-free part: exactly one attempt gets `Claimed`, even when
 	two arrive together. That attempt does the work and `remember`s how it
 	ended. A repeat reads that back with `dedup`, so it gets exactly the answer
-	the first attempt got. A repeat that arrives while the first is still running finds
-	nothing remembered yet, and is told to try again.
+	the first attempt got. A repeat that arrives while the first is still
+	running finds nothing remembered yet, and is told to try again. A key sent
+	again with a different order is refused: it names one order, not a session.
+
+	Keys are shared by every caller of this anonymous route, so a client must
+	make each one unguessable, such as a fresh UUID per order. Two clients that
+	both counted from `1` would be given each other's answers.
 
 	When this handler fails (a fault, an `Err`, or a 5xx) the claim is given
 	back, so the client's retry is processed, which is why a warehouse outage
@@ -103,9 +123,13 @@ service orders from http {
 		let claimed <- Idempotency.claim(key, KeyWindow)
 		match claimed {
 			AlreadyClaimed => {
-				let earlier <- Idempotency.dedup[Outcome](key)
+				let earlier <- Idempotency.dedup[Answered](key)
 				match earlier {
-					Some(outcome) => answer(outcome),
+					Some(a) => if a.order == body {
+						answer(a.outcome)
+					} else {
+						BadRequest("this Idempotency-Key was used for a different order")
+					},
 					None => Conflict("this order is still being placed, try again shortly"),
 				}
 			},
@@ -115,11 +139,25 @@ service orders from http {
 				// them, so both stay in this handler rather than in a helper.
 				match reserved {
 					Ok(id) => {
-						do Idempotency.remember[Outcome](key, Placed(id), KeyWindow)
+						do Idempotency.remember[Answered](
+							key,
+							Answered {
+								order: body,
+								outcome: Placed(id),
+							},
+							KeyWindow
+						)
 						answer(Placed(id))
 					},
 					Err(OutOfStock) => {
-						do Idempotency.remember[Outcome](key, SoldOut, KeyWindow)
+						do Idempotency.remember[Answered](
+							key,
+							Answered {
+								order: body,
+								outcome: SoldOut,
+							},
+							KeyWindow
+						)
 						answer(SoldOut)
 					},
 					Err(WarehouseDown) => {

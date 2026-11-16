@@ -56,6 +56,20 @@ case "an auto-reply is never answered, even from a verified sender" {
 	expect triage(mailWithHeader("auto-submitted", "no"), true) is Reply(_)
 }
 
+// A bounce, from the null sender. Built in a function for the same reason as
+// `mailWithHeader`.
+fn bounce() -> InboundEmail {
+	InboundEmail {
+		from: "",
+		to: "support@shop.example",
+		subject: "Undelivered Mail Returned to Sender",
+	}
+}
+
+case "a bounce is never answered, even with no robot headers" {
+	expect triage(bounce(), true) is Accept
+}
+
 case "an unverified sender never earns a reply" {
 	expect triage(mailAbout("where is my parcel?"), false) is Accept
 }

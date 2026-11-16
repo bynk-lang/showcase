@@ -32,8 +32,14 @@ on PUT("/videos/:name") (
 		BadRequest("send a Content-Length")
 	}
 	let Some(size) = Int.parse(length) else { BadRequest("Content-Length is not a number") }
-	let _ <- Videos.putStream(name, body, size)
-	NoContent
+	if size <= 0 {
+		BadRequest("Content-Length must be positive")
+	} else if size > MaxVideo {
+		PayloadTooLarge("a video is at most 2 GB")
+	} else {
+		let _ <- Videos.putStream(name, body, size)
+		NoContent
+	}
 }
 ```
 
@@ -42,9 +48,22 @@ write, and R2 stores nothing, so a client that lies about its length can't
 leave half a video behind. A browser that `PUT`s a `File` sends a length. An
 upload sent chunked has none, so the handler refuses it.
 
+The claimed length is checked before the write starts. Zero or less is a
+`400`, and more than `MaxVideo`, the same two gigabytes as the service's
+`maxBody`, is a `413` at once, rather than after two gigabytes have streamed
+into R2 and the router has cut the read off.
+
+Anyone may call this route, and `putStream` replaces whatever is stored under
+`name`. That keeps the example to streaming. A real service would authenticate
+the uploader, or write once, as [`files-in-r2`](../files-in-r2/) does with
+`onlyIf: Absent`.
+
 [`tests/media/videos.bynk`](tests/media/videos.bynk) is the unit suite. A case
 passes the body as `Stream.of([…])` and sets `Content-Length` itself, then
-reads the in-memory bucket to see the chunks stored as one object.
+reads the in-memory bucket to see the chunks stored as one object. Other
+cases refuse a length of zero or less and one over the cap before anything is
+written, and show that a stream shorter than its `Content-Length` stores
+nothing.
 
 [`tests/media/boundary.bynk`](tests/media/boundary.bynk) is a `system` suite,
 where the router's checks run: a `text/plain` body is refused before the

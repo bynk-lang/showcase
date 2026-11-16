@@ -73,8 +73,9 @@ straight away; without that key, an unknown SKU would be "ordered", because an
 starts from an empty database with `schema.sql` applied, so the `CHECK`, the
 foreign key and the rollback all happen for real. One case counts the orders
 after a refused second order, calling `Main.first` directly, and finds just
-the first: the second's row was inserted and then rolled back. A `stub` still answers before the
-database, which is how the last case forces a `PgConnection` outage.
+the first: the second's row was inserted and then rolled back. A `stub` still
+answers before the database, which is how the last case forces a `PgConnection`
+outage.
 
 ## Run it
 

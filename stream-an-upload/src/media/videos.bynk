@@ -9,10 +9,17 @@ consumes bynk.cloudflare { R2 }
 --- The bucket. `bynk deploy` creates it as `<worker>-videos`.
 capability Videos = R2
 
+---
+The most a client may send: two gigabytes. The service's `limits` repeats it,
+and the handler checks a claimed `Content-Length` against it first, so a
+client that announces too much is refused before a byte is written.
+---
+const MaxVideo: Int = 2_000_000_000
+
 service videos from http {
-	// A `@raw` route must bound its body: here, two gigabytes. A streamed body
-	// is counted as the handler reads it, so the cap holds even when the client
-	// sends no length.
+	// A `@raw` route must bound its body: here, two gigabytes (`MaxVideo`). A
+	// streamed body is counted as the handler reads it, so the cap holds even
+	// when the client sends no length.
 	limits {
 		maxBody: 2_000_000_000,
 	}
@@ -25,7 +32,12 @@ service videos from http {
 	`putStream` writes exactly `size` bytes, so the size comes from the
 	`Content-Length` header. A stream with more or fewer bytes faults the
 	write and R2 stores nothing, so a client that lies about the length can't
-	leave half a video behind.
+	leave half a video behind. A length that is zero or less, or over
+	`MaxVideo`, is refused before the write starts.
+
+	Anyone may call this route, and `putStream` replaces whatever is stored
+	under `name`. A real service would authenticate the uploader, or write
+	once, as `files-in-r2` does with `onlyIf: Absent`.
 	---
 	@raw(contentType: "video/mp4")
 	on PUT("/videos/:name") (
@@ -37,7 +49,13 @@ service videos from http {
 			BadRequest("send a Content-Length")
 		}
 		let Some(size) = Int.parse(length) else { BadRequest("Content-Length is not a number") }
-		let _ <- Videos.putStream(name, body, size)
-		NoContent
+		if size <= 0 {
+			BadRequest("Content-Length must be positive")
+		} else if size > MaxVideo {
+			PayloadTooLarge("a video is at most 2 GB")
+		} else {
+			let _ <- Videos.putStream(name, body, size)
+			NoContent
+		}
 	}
 }
