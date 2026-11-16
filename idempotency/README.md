@@ -37,9 +37,13 @@ you call, so it can deduplicate too.
 let claimed <- Idempotency.claim(key, KeyWindow)
 match claimed {
 	AlreadyClaimed => {
-		let earlier <- Idempotency.dedup[Outcome](key)
+		let earlier <- Idempotency.dedup[Answered](key)
 		match earlier {
-			Some(outcome) => answer(outcome),
+			Some(a) => if a.order == body {
+				answer(a.outcome)
+			} else {
+				BadRequest("this Idempotency-Key was used for a different order")
+			},
 			None => Conflict("this order is still being placed, try again shortly"),
 		}
 	},
@@ -50,12 +54,21 @@ match claimed {
 The winner asks `Warehouse` to reserve stock, passing the key along, and
 remembers how that ended, as an `Outcome`: `Placed(reservation)` or `SoldOut`.
 Both are finished answers, and `answer` turns either into the same response
-every time. A warehouse outage remembers nothing and answers `503`, so the
-claim is released and the retry tries again.
+every time. The order goes into the remembered value too, so a repeat that
+carries the same key but a different order is refused with a `400` instead of
+being told the first order went through. A warehouse outage remembers nothing
+and answers `503`, so the claim is released and the retry tries again.
 
 Keys are scoped to the function that calls `claim`, `dedup` or `remember`, so
 two handlers can't collide on the same key, and the calls stay in the handler
-rather than in a helper that every caller would share.
+rather than in a helper that every caller would share. They aren't scoped to
+the caller, though: this route is anonymous, so a client must make each key
+unguessable, such as a fresh UUID per order. Two clients that both counted
+from `1` would be given each other's answers. On an authenticated route, put
+the caller's identity in the key.
+
+A `Sku` is held to letters, digits and hyphens because the provider puts it in
+the warehouse's URL, where a `/` or `?` would change the request.
 
 On Cloudflare, claims and remembered values live in a D1 database that the
 build declares for you: `bynk deploy` creates it, and you write no SQL.
@@ -64,7 +77,8 @@ build declares for you: `bynk deploy` creates it, and you write no SQL.
 which honours each window on the test clock. A retry gets `Created("r-1")`
 again and `Warehouse.reserve` is `called once`; a `503` gives the key back; an
 out-of-stock answer is kept even after stock returns; and `advance Clock by
-25.hours` lets the key be used afresh.
+25.hours` lets the key be used afresh. A key sent again with a different order
+is refused, and the warehouse is called only once.
 
 ## Run it
 

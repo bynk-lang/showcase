@@ -33,7 +33,8 @@ only to a sender whose mail passed DMARC.
 out-of-office, a bounce or list mail (RFC 3834), or two helpdesks can thank each
 other forever. The runtime doesn't check for this, so `triage` does, through
 `isAutomated`: an `Auto-Submitted` header other than `no`, a `Precedence` of
-`bulk`, `list` or `junk`, or a `List-Id`.
+`bulk`, `list` or `junk`, a `List-Id`, or an empty envelope sender, which is
+how a bounce arrives even when it carries none of those headers.
 
 ## Walkthrough
 
@@ -72,8 +73,8 @@ only the fields each case is about; the rest have defaults. `support.message(…
 runs the handler with no Worker and no mail. A suite has no Email Routing, so the
 sender's verdict there is always `DmarcNone`, and the reply branch is tested
 through `triage` with `verified` true and false. Two more cases pin a refund
-spotted whatever its case, and an out-of-office or bulk digest left unanswered
-even when verified.
+spotted whatever its case, and an out-of-office, a bulk digest or a bounce left
+unanswered even when verified.
 
 ## Run it
 

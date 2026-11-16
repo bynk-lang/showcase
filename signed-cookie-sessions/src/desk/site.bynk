@@ -81,6 +81,10 @@ service site from http {
 	Sign in. The credentials are checked first: the cookie proves who it was
 	issued to, not that they should have had it. Issuing reads the clock, to
 	stamp the cookie's expiry, so the handler is given `Clock`.
+
+	Nothing here limits how often someone may guess. A real sign-in route
+	should be rate-limited per user name, as the `rate-limiting` project shows,
+	so a password list can't be tried as fast as `Accounts` answers.
 	---
 	on POST("/login") (body: Login) -> Effect[HttpResult[String]] by Visitor given Accounts, Clock {
 		let Ok(id) = UserId.of(body.user) else { BadRequest("a user name is 1 to 64 characters") }

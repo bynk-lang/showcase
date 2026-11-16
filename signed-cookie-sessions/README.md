@@ -51,7 +51,10 @@ if ok {
 }
 ```
 
-Issuing stamps an expiry, so the handler is `given Clock`. `/me` and `/away`
+Issuing stamps an expiry, so the handler is `given Clock`. Nothing in this
+example limits how often someone may guess a password: a real `/login` should
+be rate-limited per user name, as [`rate-limiting`](../rate-limiting/) shows,
+so a password list can't be tried as fast as the accounts service answers. `/me` and `/away`
 are guarded `by u: User`, and `/logout` sends the cookie back expired.
 
 `secret = "SESSION_KEY"` names a variable, not a key. `bynk deploy` mints a

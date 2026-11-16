@@ -18,9 +18,9 @@ dead-letter queue takes it.
 On the producer side, `Queue @name("packing")` from `bynk.cloudflare` is a
 capability like any other, so the route names it in `given`. The route waits
 for the send with `let _ <-`, because it must not promise work that isn't on the
-queue yet. Its log line uses `do ….detach()`, which stops waiting for an effect that is
-already running, because nothing depends on it finishing. If a detached effect
-fails, the runtime reports the failure instead of losing it.
+queue yet. Its log line uses `do ….detach()`, which stops waiting for an
+effect that is already running, because nothing depends on it finishing. If a
+detached effect fails, the runtime reports the failure instead of losing it.
 
 ## Walkthrough
 

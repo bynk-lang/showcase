@@ -74,3 +74,21 @@ case "an order without a key is refused before anything is claimed" {
 	expect r is BadRequest(_)
 	expect Warehouse.reserve never called
 }
+
+// A key names one order. Sent again with a different one, it's refused rather
+// than answered with the first order's reservation.
+case "a key reused for a different order is refused" {
+	stub Warehouse.reserve(_, _, _) returns each [Ok("r-1"), Ok("r-2")]
+	let first <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
+	let other <- orders.POST(
+		"/orders",
+		keyed("k-1"),
+		OrderRequest {
+			sku: "mug",
+			quantity: 5,
+		}
+	) by Visitor
+	expect first == Created("r-1")
+	expect other is BadRequest(_)
+	expect Warehouse.reserve called once
+}
