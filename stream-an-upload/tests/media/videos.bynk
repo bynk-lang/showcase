@@ -37,24 +37,19 @@ case "a Content-Length that isn't a number is refused" {
 	expect r is BadRequest(_)
 }
 
+--- Headers that claim a body of `n` bytes, whatever the stream holds.
+fn claiming(n: String) -> RequestHeaders {
+	RequestHeaders.of(["Content-Length: \(n)"])
+}
+
 case "a length of zero or less is refused before anything is written" {
-	let r <- videos.PUT(
-		"/videos/:name",
-		"clip.mp4",
-		RequestHeaders.of(["Content-Length: -1"]),
-		chunks()
-	) by Visitor
+	let r <- videos.PUT("/videos/:name", "clip.mp4", claiming("-1"), chunks()) by Visitor
 	expect r is BadRequest(_)
 	expect Videos.putStream never called
 }
 
 case "a length over the cap is refused before anything is written" {
-	let r <- videos.PUT(
-		"/videos/:name",
-		"clip.mp4",
-		RequestHeaders.of(["Content-Length: 5000000000"]),
-		chunks()
-	) by Visitor
+	let r <- videos.PUT("/videos/:name", "clip.mp4", claiming("5000000000"), chunks()) by Visitor
 	expect r is PayloadTooLarge(_)
 	expect Videos.putStream never called
 }
@@ -62,12 +57,7 @@ case "a length over the cap is refused before anything is written" {
 // `putStream` writes exactly the length it was given. A stream one byte short
 // of what the client claimed faults the write, and nothing is stored.
 case "a stream shorter than its Content-Length stores nothing" {
-	expect videos.PUT(
-		"/videos/:name",
-		"clip.mp4",
-		RequestHeaders.of(["Content-Length: 9"]),
-		chunks()
-	) by Visitor faults
+	expect videos.PUT("/videos/:name", "clip.mp4", claiming("9"), chunks()) by Visitor faults
 	let stored <- Videos.get("clip.mp4")
 	expect stored == None
 }

@@ -16,6 +16,13 @@ fn order() -> OrderRequest {
 	}
 }
 
+fn otherOrder() -> OrderRequest {
+	OrderRequest {
+		sku: "mug",
+		quantity: 5,
+	}
+}
+
 case "the first attempt places the order" {
 	stub Warehouse.reserve(_, _, _) returns Ok("r-1")
 	let r <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
@@ -80,14 +87,7 @@ case "an order without a key is refused before anything is claimed" {
 case "a key reused for a different order is refused" {
 	stub Warehouse.reserve(_, _, _) returns each [Ok("r-1"), Ok("r-2")]
 	let first <- orders.POST("/orders", keyed("k-1"), order()) by Visitor
-	let other <- orders.POST(
-		"/orders",
-		keyed("k-1"),
-		OrderRequest {
-			sku: "mug",
-			quantity: 5,
-		}
-	) by Visitor
+	let other <- orders.POST("/orders", keyed("k-1"), otherOrder()) by Visitor
 	expect first == Created("r-1")
 	expect other is BadRequest(_)
 	expect Warehouse.reserve called once
